@@ -5,6 +5,7 @@ import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
+import { readJsonResponse } from "@/lib/read-json-response";
 
 type Account = { id: string; name: string | null; email: string | null };
 type DiagramSummary = { id: string; name: string; entityCount: number; relationCount: number; createdAt: string; updatedAt: string };
@@ -25,14 +26,15 @@ export default function DashboardPage() {
     try {
       const accountResponse = await fetch("/api/account", { cache: "no-store" });
       if (accountResponse.status === 401) { router.replace("/login"); return; }
-      const accountResult = await accountResponse.json();
+      const accountResult = await readJsonResponse<{ error?: string; user?: Account }>(accountResponse);
       if (!accountResponse.ok) throw new Error(accountResult.error || "Không thể kiểm tra tài khoản.");
+      if (!accountResult.user) throw new Error("Máy chủ chưa trả về thông tin tài khoản.");
       setAccount(accountResult.user);
 
       const diagramsResponse = await fetch("/api/diagrams", { cache: "no-store" });
-      const diagramsResult = await diagramsResponse.json();
+      const diagramsResult = await readJsonResponse<{ error?: string; diagrams?: DiagramSummary[] }>(diagramsResponse);
       if (!diagramsResponse.ok) throw new Error(diagramsResult.error || "Không thể tải sơ đồ.");
-      setDiagrams(diagramsResult.diagrams);
+      setDiagrams(diagramsResult.diagrams ?? []);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Không thể tải dữ liệu.");
     } finally {
@@ -54,8 +56,9 @@ export default function DashboardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
-      const result = await response.json();
+      const result = await readJsonResponse<{ error?: string; id?: string }>(response);
       if (!response.ok) throw new Error(result.error || "Không thể tạo sơ đồ.");
+      if (!result.id) throw new Error("Máy chủ chưa trả về mã sơ đồ mới.");
       router.push(`/diagrams/${result.id}`);
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "Không thể tạo sơ đồ.");
@@ -68,7 +71,7 @@ export default function DashboardPage() {
     if (!window.confirm(`Xóa sơ đồ “${diagram.name}”? Thao tác này không thể hoàn tác.`)) return;
     try {
       const response = await fetch(`/api/diagrams/${diagram.id}`, { method: "DELETE" });
-      const result = await response.json();
+      const result = await readJsonResponse<{ error?: string }>(response);
       if (!response.ok) throw new Error(result.error || "Không thể xóa sơ đồ.");
       setDiagrams((current) => current.filter((item) => item.id !== diagram.id));
     } catch (deleteError) {

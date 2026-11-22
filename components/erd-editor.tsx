@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent, ReactNode } from "react";
+import { readJsonResponse } from "@/lib/read-json-response";
 
 type Column = { id: string; name: string; type: string; pk?: boolean; nullable?: boolean };
 type Entity = { id: string; name: string; x: number; y: number; columns: Column[] };
@@ -214,7 +215,7 @@ export default function ErdEditor({ diagramId }: { diagramId: string }) {
         const response = await fetch(`/api/diagrams/${diagramId}`, { cache: "no-store" });
         if (response.status === 401) { router.replace("/login"); return; }
         if (response.status === 404) { router.replace("/"); return; }
-        const result = await response.json();
+        const result = await readJsonResponse<{ error?: string; name?: string; entities?: Entity[]; relations?: Relation[]; decorations?: Decoration[] }>(response);
         if (!response.ok) throw new Error(result.error || "Không thể mở sơ đồ.");
         const payload = {
           name: result.name as string,

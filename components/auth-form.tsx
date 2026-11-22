@@ -5,6 +5,7 @@ import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { readJsonResponse } from "@/lib/read-json-response";
 
 export default function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
@@ -26,7 +27,7 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name, email, password }),
         });
-        const result = await response.json();
+        const result = await readJsonResponse<{ error?: string }>(response);
         if (!response.ok) throw new Error(result.error || "Không thể tạo tài khoản.");
       }
       const result = await signIn("credentials", { email, password, redirect: false });
@@ -34,7 +35,13 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
       router.replace("/");
       router.refresh();
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Đã xảy ra lỗi. Hãy thử lại.");
+      if (submitError instanceof SyntaxError) {
+        setError(isRegister
+          ? "Tài khoản có thể đã được tạo, nhưng đăng nhập trả về phản hồi không hợp lệ. Hãy thử đăng nhập lại."
+          : "Máy chủ đăng nhập trả về phản hồi không hợp lệ. Hãy thử lại sau.");
+      } else {
+        setError(submitError instanceof Error ? submitError.message : "Đã xảy ra lỗi. Hãy thử lại.");
+      }
     } finally {
       setBusy(false);
     }
