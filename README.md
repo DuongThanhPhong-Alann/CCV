@@ -29,4 +29,12 @@ Mở `http://localhost:3000`. Sau khi thay đổi `.env.local`, hãy khởi đ�
 - Tên sơ đồ sửa trực tiếp ở thanh trên. Thay đổi được tự động lưu lên MongoDB sau thao tác.
 - Trong editor có thể xuất script PostgreSQL, MongoDB hoặc Supabase.
 
-MongoDB lưu tài khoản trong collection `users` và sơ đồ trong `diagrams`. Đừng đưa thông tin kết nối thật vào Git.
+## Bài tập
+
+- Mọi tài khoản đều có thể giao bài bằng email của một tài khoản ERD Draw khác.
+- Người nhận xem lời mời trong tab **Được giao**, rồi chấp nhận hoặc từ chối.
+- Chấp nhận bài sẽ tạo một sơ đồ trắng gắn với bài tập. Người làm có thể tiếp tục sửa sau khi nộp và gửi lại nhiều lần.
+- Mỗi lần nộp lưu một phiên bản riêng. Người giao xem nội dung bài nộp, chấm từ 0 đến 10 và gửi nhận xét.
+- Tab **Đã giao** giúp người giao theo dõi phản hồi, bài nộp và kết quả.
+
+MongoDB lưu tài khoản trong collection `users`, sơ đồ trong `diagrams` và lời mời/bài nộp trong `tasks`. Đừng đưa thông tin kết nối thật vào Git.

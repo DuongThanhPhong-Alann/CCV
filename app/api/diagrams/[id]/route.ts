@@ -22,12 +22,20 @@ export async function GET(_request: Request, { params }: RouteContext) {
   try {
     const diagram = await getDatabase().collection("diagrams").findOne(filter);
     if (!diagram) return Response.json({ error: "Không tìm thấy sơ đồ." }, { status: 404 });
+    const taskPrompt = diagram.taskId
+      ? await getDatabase().collection<{ title?: string; description?: string }>("tasks").findOne(
+          { _id: diagram.taskId, assignedToId: ownerId },
+          { projection: { title: 1, description: 1 } },
+        )
+      : null;
     return Response.json({
       id: diagram._id.toString(),
       name: diagram.name,
+      taskId: diagram.taskId?.toString() ?? null,
       entities: diagram.entities ?? [],
       relations: diagram.relations ?? [],
       decorations: diagram.decorations ?? [],
+      taskPrompt: taskPrompt ? { title: taskPrompt.title ?? "Bài tập", description: taskPrompt.description ?? "" } : null,
       updatedAt: diagram.updatedAt,
     });
   } catch {
@@ -82,7 +90,11 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
   if (!filter) return Response.json({ error: "Không tìm thấy sơ đồ." }, { status: 404 });
 
   try {
-    const result = await getDatabase().collection("diagrams").deleteOne(filter);
+    const diagrams = getDatabase().collection("diagrams");
+    const diagram = await diagrams.findOne(filter, { projection: { taskId: 1 } });
+    if (!diagram) return Response.json({ error: "Không tìm thấy sơ đồ." }, { status: 404 });
+    if (diagram.taskId) return Response.json({ error: "Không thể xóa sơ đồ gắn với bài tập." }, { status: 409 });
+    const result = await diagrams.deleteOne(filter);
     if (!result.deletedCount) return Response.json({ error: "Không tìm thấy sơ đồ." }, { status: 404 });
     return Response.json({ ok: true });
   } catch {

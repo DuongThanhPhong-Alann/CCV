@@ -15,6 +15,7 @@ export async function GET() {
       { $match: { ownerId } },
       { $project: {
         name: 1,
+        taskId: 1,
         createdAt: 1,
         updatedAt: 1,
         entityCount: { $size: { $ifNull: ["$entities", []] } },
@@ -22,7 +23,7 @@ export async function GET() {
       } },
       { $sort: { updatedAt: -1 } },
     ]).toArray();
-    return Response.json({ diagrams: diagrams.map(({ _id, ...diagram }) => ({ ...diagram, id: _id.toString() })) });
+    return Response.json({ diagrams: diagrams.map(({ _id, ...diagram }) => ({ ...diagram, id: _id.toString(), taskId: diagram.taskId?.toString() ?? null })) });
   } catch {
     return Response.json({ error: "Không thể tải danh sách sơ đồ. Kiểm tra kết nối MongoDB." }, { status: 503 });
   }

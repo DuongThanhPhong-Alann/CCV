@@ -8,7 +8,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { readJsonResponse } from "@/lib/read-json-response";
 
 type Account = { id: string; name: string | null; email: string | null };
-type DiagramSummary = { id: string; name: string; entityCount: number; relationCount: number; createdAt: string; updatedAt: string };
+type DiagramSummary = { id: string; name: string; entityCount: number; relationCount: number; createdAt: string; updatedAt: string; taskId?: string | null };
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -83,8 +83,18 @@ export default function DashboardPage() {
 
   return <main className="dashboard-page">
     <header className="dashboard-topbar">
-      <Link className="dashboard-brand" href="/"><Image src="/erd-draw-logo.png" alt="ERD Draw" width={144} height={96} priority unoptimized /></Link>
-      <div className="dashboard-user"><div className="user-avatar">{(account?.name || account?.email || "U").slice(0, 1).toUpperCase()}</div><div className="user-details"><strong>{account?.name || "Tài khoản"}</strong><span>{account?.email}</span></div><button type="button" onClick={() => void signOut({ callbackUrl: "/login" })}>Đăng xuất</button></div>
+      <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+        <Link className="dashboard-brand" href="/"><Image src="/erd-draw-logo.png" alt="ERD Draw" width={144} height={96} priority unoptimized /></Link>
+        <nav className="dashboard-topnav">
+          <Link className="topnav-tab active" href="/">📁 Sơ đồ của tôi</Link>
+          <Link className="topnav-tab" href="/tasks">📝 Bài tập</Link>
+        </nav>
+      </div>
+      <div className="dashboard-user">
+        <div className="user-avatar">{(account?.name || account?.email || "U").slice(0, 1).toUpperCase()}</div>
+        <div className="user-details"><strong>{account?.name || "Tài khoản"}</strong><span>{account?.email}</span></div>
+        <button type="button" onClick={() => void signOut({ callbackUrl: "/login" })}>Đăng xuất</button>
+      </div>
     </header>
     <section className="dashboard-content">
       <div className="dashboard-heading"><div><span className="dashboard-eyebrow">KHÔNG GIAN CỦA BẠN</span><h1>Sơ đồ cơ sở dữ liệu</h1><p>Tạo, chỉnh sửa và quản lý các sơ đồ ERD của bạn.</p></div><button className="create-diagram-button" type="button" onClick={() => { setNewName(""); setError(""); setShowCreate(true); }}><span>＋</span> Tạo sơ đồ mới</button></div>
@@ -94,10 +104,14 @@ export default function DashboardPage() {
           <Link className="diagram-card-open" href={`/diagrams/${diagram.id}`}>
             <div className="diagram-preview"><span className="preview-entity preview-one"><i /><i /><i /></span><span className="preview-entity preview-two"><i /><i /></span><span className="preview-link" /></div>
             <div className="diagram-card-title"><h2>{diagram.name}</h2><span className="card-arrow">↗</span></div>
-            <p className="diagram-card-meta">{diagram.entityCount} bảng <span>·</span> {diagram.relationCount} quan hệ</p>
+            {diagram.taskId && <span className="diagram-task-badge">BÀI TẬP</span>}
+            <div style={{display:"flex",gap:6,marginTop:8,marginBottom:4}}>
+              <span className="card-stat card-stat-tables">🗂 {diagram.entityCount} bảng</span>
+              <span className="card-stat card-stat-relations">🔗 {diagram.relationCount} quan hệ</span>
+            </div>
             <span className="diagram-card-date">Cập nhật {new Date(diagram.updatedAt).toLocaleString("vi-VN", { dateStyle: "medium", timeStyle: "short" })}</span>
           </Link>
-          <button className="diagram-delete" type="button" aria-label={`Xóa sơ đồ ${diagram.name}`} title="Xóa sơ đồ" onClick={() => void deleteDiagram(diagram)}>×</button>
+          {!diagram.taskId && <button className="diagram-delete" type="button" aria-label={`Xóa sơ đồ ${diagram.name}`} title="Xóa sơ đồ" onClick={() => void deleteDiagram(diagram)}>×</button>}
         </article>
       ))}</div> : <section className="dashboard-empty"><div className="empty-illustration"><span /><span /><span /><i /></div><h2>Bạn chưa có sơ đồ nào</h2><p>Tạo sơ đồ mới và đặt tên trước khi bắt đầu thiết kế.</p><button type="button" className="create-diagram-button" onClick={() => { setNewName(""); setError(""); setShowCreate(true); }}>＋ Tạo sơ đồ đầu tiên</button></section>}
       <footer className="dashboard-footer"><span className="status-indicator" /> Sơ đồ của bạn được lưu tự động trên MongoDB.</footer>
