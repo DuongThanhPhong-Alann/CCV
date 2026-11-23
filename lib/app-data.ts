@@ -238,7 +238,7 @@ async function upsertPrimary(collection: AppCollection, document: AppDocument, m
   const { data: existing, error: readError } = await client.from(collection).select("revision").eq("_id", id).maybeSingle();
   if (readError) throw readError;
   const revision = Math.max(nextRevision(Number(existing?.revision ?? 0)), minimumRevision);
-  const { error } = await client.from(collection).upsert(toRow(collection, document, revision, mongoSynced), { onConflict: "_id" });
+  const { error } = await client.from(collection).upsert(toRow(collection, document, revision, mongoSynced) as any, { onConflict: "_id" });
   if (error) throw error;
   return revision;
 }
@@ -294,7 +294,7 @@ async function readPrimaryList(collection: AppCollection, filters: AppFilters, l
     const { data, error } = await applyFilters(client.from(collection).select("_id,document,revision"), collection, filters)
       .order("updatedAt", { ascending: false }).limit(limit);
     if (error) throw error;
-    return (data ?? []).map((row) => fromRow(row as RecordRow));
+    return (data ?? []).map((row: any) => fromRow(row as RecordRow));
   };
   const result = await queryPrimary();
   if (await flushOutbox(collection)) return await queryPrimary();
