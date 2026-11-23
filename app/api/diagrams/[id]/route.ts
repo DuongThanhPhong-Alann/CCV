@@ -1,4 +1,5 @@
 import { ObjectId } from "mongodb";
+import { deleteAppDocument, findAppDocument, writeAppDocument, type AppDocument } from "@/lib/app-data";
 import { currentOwnerId } from "@/lib/current-user";
 import { getDatabase } from "@/lib/mongodb";
 
@@ -20,13 +21,14 @@ export async function GET(_request: Request, { params }: RouteContext) {
   if (!filter) return Response.json({ error: "Không tìm thấy sơ đồ." }, { status: 404 });
 
   try {
-    const diagram = await getDatabase().collection("diagrams").findOne(filter);
+    const diagram = await findAppDocument<AppDocument & { ownerId: ObjectId; name?: string; taskId?: ObjectId; entities?: unknown[]; relations?: unknown[]; decorations?: unknown[]; updatedAt?: Date }>("diagrams", id, () => getDatabase().collection("diagrams").findOne(filter));
     if (!diagram) return Response.json({ error: "Không tìm thấy sơ đồ." }, { status: 404 });
+    if (!diagram.ownerId.equals(ownerId)) return Response.json({ error: "Not found." }, { status: 404 });
     const taskPrompt = diagram.taskId
-      ? await getDatabase().collection<{ title?: string; description?: string }>("tasks").findOne(
+      ? await findAppDocument<AppDocument & { title?: string; description?: string }>("tasks", diagram.taskId.toString(), () => getDatabase().collection<{ title?: string; description?: string }>("tasks").findOne(
           { _id: diagram.taskId, assignedToId: ownerId },
           { projection: { title: 1, description: 1 } },
-        )
+        ))
       : null;
     return Response.json({
       id: diagram._id.toString(),
@@ -39,7 +41,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
       updatedAt: diagram.updatedAt,
     });
   } catch {
-    return Response.json({ error: "Không thể tải sơ đồ. Kiểm tra kết nối MongoDB." }, { status: 503 });
+    return Response.json({ error: "Không thể tải sơ đồ. Kiểm tra kết nối Supabase hoặc MongoDB." }, { status: 503 });
   }
 }
 
@@ -74,11 +76,13 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   if (Object.keys(update).length === 0) return Response.json({ error: "Không có thay đổi để lưu." }, { status: 400 });
 
   try {
-    const result = await getDatabase().collection("diagrams").updateOne(filter, { $set: { ...update, updatedAt: new Date() } });
-    if (!result.matchedCount) return Response.json({ error: "Không tìm thấy sơ đồ." }, { status: 404 });
-    return Response.json({ ok: true, updatedAt: new Date().toISOString() });
+    const diagram = await findAppDocument<AppDocument & { ownerId: ObjectId }>("diagrams", id, () => getDatabase().collection("diagrams").findOne(filter));
+    if (!diagram || !diagram.ownerId.equals(ownerId)) return Response.json({ error: "Không tìm thấy sơ đồ." }, { status: 404 });
+    const updatedAt = new Date();
+    await writeAppDocument("diagrams", { ...diagram, ...update, updatedAt });
+    return Response.json({ ok: true, updatedAt: updatedAt.toISOString() });
   } catch {
-    return Response.json({ error: "Không thể lưu sơ đồ. Kiểm tra kết nối MongoDB." }, { status: 503 });
+    return Response.json({ error: "Không thể lưu sơ đồ vào Supabase hoặc MongoDB." }, { status: 503 });
   }
 }
 
@@ -90,14 +94,13 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
   if (!filter) return Response.json({ error: "Không tìm thấy sơ đồ." }, { status: 404 });
 
   try {
-    const diagrams = getDatabase().collection("diagrams");
-    const diagram = await diagrams.findOne(filter, { projection: { taskId: 1 } });
+    const diagram = await findAppDocument<AppDocument & { ownerId: ObjectId; taskId?: ObjectId }>("diagrams", id, () => getDatabase().collection("diagrams").findOne(filter, { projection: { ownerId: 1, taskId: 1 } }));
     if (!diagram) return Response.json({ error: "Không tìm thấy sơ đồ." }, { status: 404 });
+    if (!diagram.ownerId.equals(ownerId)) return Response.json({ error: "Không tìm thấy sơ đồ." }, { status: 404 });
     if (diagram.taskId) return Response.json({ error: "Không thể xóa sơ đồ gắn với bài tập." }, { status: 409 });
-    const result = await diagrams.deleteOne(filter);
-    if (!result.deletedCount) return Response.json({ error: "Không tìm thấy sơ đồ." }, { status: 404 });
+    await deleteAppDocument("diagrams", id);
     return Response.json({ ok: true });
   } catch {
-    return Response.json({ error: "Không thể xóa sơ đồ. Kiểm tra kết nối MongoDB." }, { status: 503 });
+    return Response.json({ error: "Không thể xóa sơ đồ khỏi Supabase hoặc MongoDB." }, { status: 503 });
   }
 }

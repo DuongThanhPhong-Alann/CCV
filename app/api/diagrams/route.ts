@@ -1,5 +1,7 @@
 import { currentOwnerId } from "@/lib/current-user";
+import { listAppDocuments, writeAppDocument, type AppDocument } from "@/lib/app-data";
 import { getDatabase } from "@/lib/mongodb";
+import { ObjectId } from "mongodb";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,22 +12,16 @@ export async function GET() {
 
   try {
     const collection = getDatabase().collection("diagrams");
-    await collection.createIndex({ ownerId: 1, updatedAt: -1 });
-    const diagrams = await collection.aggregate([
-      { $match: { ownerId } },
-      { $project: {
-        name: 1,
-        taskId: 1,
-        createdAt: 1,
-        updatedAt: 1,
-        entityCount: { $size: { $ifNull: ["$entities", []] } },
-        relationCount: { $size: { $ifNull: ["$relations", []] } },
-      } },
-      { $sort: { updatedAt: -1 } },
-    ]).toArray();
-    return Response.json({ diagrams: diagrams.map(({ _id, ...diagram }) => ({ ...diagram, id: _id.toString(), taskId: diagram.taskId?.toString() ?? null })) });
+    const diagrams = await listAppDocuments<AppDocument & { name?: string; taskId?: ObjectId; entities?: unknown[]; relations?: unknown[] }>("diagrams", { ownerId: ownerId.toString() }, () => collection.find({ ownerId }).sort({ updatedAt: -1 }).toArray());
+    return Response.json({ diagrams: diagrams.map(({ _id, _revision: _ignoreRevision, taskId, entities, relations, ...diagram }) => ({
+      ...diagram,
+      id: _id.toString(),
+      taskId: taskId?.toString() ?? null,
+      entityCount: entities?.length ?? 0,
+      relationCount: relations?.length ?? 0,
+    })) });
   } catch {
-    return Response.json({ error: "Không thể tải danh sách sơ đồ. Kiểm tra kết nối MongoDB." }, { status: 503 });
+    return Response.json({ error: "Không thể tải danh sách sơ đồ. Kiểm tra kết nối Supabase hoặc MongoDB." }, { status: 503 });
   }
 }
 
@@ -44,7 +40,9 @@ export async function POST(request: Request) {
 
   try {
     const now = new Date();
-    const result = await getDatabase().collection("diagrams").insertOne({
+    const id = new ObjectId();
+    await writeAppDocument("diagrams", {
+      _id: id,
       ownerId,
       name,
       entities: [],
@@ -53,8 +51,8 @@ export async function POST(request: Request) {
       createdAt: now,
       updatedAt: now,
     });
-    return Response.json({ id: result.insertedId.toString(), name }, { status: 201 });
+    return Response.json({ id: id.toString(), name }, { status: 201 });
   } catch {
-    return Response.json({ error: "Không thể tạo sơ đồ. Kiểm tra kết nối MongoDB." }, { status: 503 });
+    return Response.json({ error: "Không thể lưu sơ đồ vào Supabase hoặc MongoDB." }, { status: 503 });
   }
 }

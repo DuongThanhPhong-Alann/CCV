@@ -16,8 +16,8 @@ function formatDate(value?: string | null) {
   return value ? new Date(value).toLocaleString("vi-VN", { dateStyle: "medium", timeStyle: "short" }) : "—";
 }
 
-function statusLabel(task: AssignmentTask) {
-  if (task.status === "draft") return { label: "Bản nháp", tone: "draft" };
+function statusLabel(task: { status: AssignmentTask["status"]; submission: { version: number } | null; grade: { submissionVersion: number } | null }) {
+  if (task.status === "draft") return { label: "Trong kho", tone: "draft" };
   if (task.status === "declined") return { label: "Đã từ chối", tone: "declined" };
   if (task.status === "invited") return { label: "Đang chờ phản hồi", tone: "waiting" };
   if (task.submission && task.grade?.submissionVersion === task.submission.version) return { label: "Đã chấm điểm", tone: "graded" };
@@ -33,6 +33,7 @@ export default function TaskDetail({ taskId }: { taskId: string }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [assignmentNotice, setAssignmentNotice] = useState("");
   const [score, setScore] = useState("");
   const [feedback, setFeedback] = useState("");
   const [recipientQuery, setRecipientQuery] = useState("");
@@ -104,9 +105,29 @@ export default function TaskDetail({ taskId }: { taskId: string }) {
       if (!response.ok) throw new Error(result.error || "Không thể giao bài tập.");
       setSelectedRecipient(null);
       setRecipientQuery("");
+      setAssignmentNotice(`Đã giao đề cho ${selectedRecipient.name}. Đề gốc vẫn nằm trong kho để bạn giao tiếp.`);
       await loadTask();
     } catch (assignError) {
       setError(assignError instanceof Error ? assignError.message : "Không thể giao bài tập.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveAsDraft = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "saveAsDraft" }),
+      });
+      const result = await readJsonResponse<{ error?: string; id?: string }>(response);
+      if (!response.ok || !result.id) throw new Error(result.error || "Không thể đưa đề vào kho.");
+      router.push(`/tasks/${result.id}`);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Không thể đưa đề vào kho.");
     } finally {
       setBusy(false);
     }
@@ -188,6 +209,7 @@ export default function TaskDetail({ taskId }: { taskId: string }) {
       </div>
 
       {error && <div className="dashboard-error" role="alert"><span>{error}</span><button type="button" onClick={() => setError("")}>Đóng</button></div>}
+      {assignmentNotice && <div className="task-assignment-message" role="status"><span>{assignmentNotice}</span><button type="button" onClick={() => setAssignmentNotice("")}>Đóng</button></div>}
 
       <article className="task-detail-card">
         <div className="task-detail-heading">
@@ -216,7 +238,7 @@ export default function TaskDetail({ taskId }: { taskId: string }) {
           <div className="task-person-card">
             <span className="person-role-tag">🎯 NGƯỜI LÀM BÀI</span>
             <strong>{task.assignedToName || "Chưa chọn người nhận"}</strong>
-            <small>{task.assignedToEmail || "Bản nháp · Chưa giao"}</small>
+            <small>{task.assignedToEmail || "Đề trong kho · Chưa giao"}</small>
           </div>
         </div>
 
@@ -225,7 +247,7 @@ export default function TaskDetail({ taskId }: { taskId: string }) {
           <section className="task-action-panel task-assign-panel">
             <div className="task-assign-copy">
               <h2>Giao bài tập cho tài khoản</h2>
-              <p>Tìm kiếm tài khoản bằng tên hoặc địa chỉ email, chọn người nhận rồi nhấn Giao bài tập.</p>
+              <p>Mỗi lần giao sẽ tạo một lượt làm bài riêng. Đề gốc vẫn ở trong kho để bạn giao cho nhiều người hoặc giao lại sau.</p>
             </div>
             <div className="recipient-picker">
               {selectedRecipient ? (
@@ -262,6 +284,38 @@ export default function TaskDetail({ taskId }: { taskId: string }) {
                 {busy ? "Đang xử lý…" : "Giao bài tập ngay"}
               </button>
             </div>
+          </section>
+        )}
+
+        {isCreator && task.status === "draft" && task.deliveries?.length ? (
+          <section className="task-deliveries">
+            <header>
+              <div><span className="dashboard-eyebrow">CÁC LƯỢT ĐÃ GIAO</span><h2>{task.deliveries.length} lượt làm bài</h2></div>
+              <Link href="/tasks">Xem danh sách đã giao →</Link>
+            </header>
+            <div className="task-delivery-list">
+              {task.deliveries.map((delivery) => {
+                const deliveryState = statusLabel(delivery);
+                return <Link key={delivery.id} href={`/tasks/${delivery.id}`} className="task-delivery-row">
+                  <span><strong>{delivery.assignedToName || "Người nhận"}</strong><small>{delivery.assignedToEmail || "—"}</small></span>
+                  <span className={`task-state task-state-${deliveryState.tone}`}><span className="task-state-dot" />{deliveryState.label}</span>
+                  <time>{formatDate(delivery.updatedAt)}</time>
+                </Link>;
+              })}
+            </div>
+          </section>
+        ) : null}
+
+        {isCreator && task.status !== "draft" && task.sourceTaskId && (
+          <div className="task-notice notice-active">Đây là một lượt làm bài riêng. <Link href={`/tasks/${task.sourceTaskId}`}>Mở đề gốc trong kho để giao thêm lượt →</Link></div>
+        )}
+
+        {isCreator && task.status !== "draft" && !task.sourceTaskId && (
+          <section className="task-action-panel task-reuse-panel">
+            <div><h2>Lưu đề này vào kho</h2><p>Tạo một bản đề gốc để bạn có thể giao bài này cho nhiều học viên.</p></div>
+            <button className="create-diagram-button" type="button" disabled={busy} onClick={() => void saveAsDraft()}>
+              {busy ? "Đang lưu…" : "Đưa đề vào kho"}
+            </button>
           </section>
         )}
 

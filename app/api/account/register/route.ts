@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
-import { MongoServerError } from "mongodb";
+import { MongoServerError, ObjectId } from "mongodb";
+import { listAppDocuments, writeAppDocument, type AppDocument } from "@/lib/app-data";
 import { getDatabase } from "@/lib/mongodb";
 
 export async function POST(request: Request) {
@@ -18,17 +19,22 @@ export async function POST(request: Request) {
   if (password.length < 8 || password.length > 100) return Response.json({ error: "Mật khẩu cần có từ 8 đến 100 ký tự." }, { status: 400 });
 
   try {
-    const users = getDatabase().collection("users");
-    await users.createIndex({ email: 1 }, { unique: true });
-    const existing = await users.findOne({ email }, { projection: { _id: 1 } });
-    if (existing) return Response.json({ error: "Email này đã được đăng ký." }, { status: 409 });
+    const matches = await listAppDocuments<AppDocument>("users", { email }, async () => {
+      const users = getDatabase().collection("users");
+      await users.createIndex({ email: 1 }, { unique: true });
+      return users.find({ email }, { projection: { _id: 1, email: 1 } }).limit(1).toArray();
+    }, 1);
+    if (matches.length) return Response.json({ error: "Email này đã được đăng ký." }, { status: 409 });
     const passwordHash = await bcrypt.hash(password, 12);
-    await users.insertOne({ name, email, emailVerified: null, image: null, passwordHash, createdAt: new Date() });
+    await writeAppDocument("users", { _id: new ObjectId(), name, email, emailVerified: null, image: null, passwordHash, createdAt: new Date() });
     return Response.json({ ok: true }, { status: 201 });
   } catch (error) {
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "23505") {
+      return Response.json({ error: "Email này đã được đăng ký." }, { status: 409 });
+    }
     if (error instanceof MongoServerError && error.code === 11000) {
       return Response.json({ error: "Email này đã được đăng ký." }, { status: 409 });
     }
-    return Response.json({ error: "Không thể lưu tài khoản. Kiểm tra cấu hình MongoDB." }, { status: 503 });
+    return Response.json({ error: "Không thể lưu tài khoản vào Supabase hoặc MongoDB." }, { status: 503 });
   }
 }

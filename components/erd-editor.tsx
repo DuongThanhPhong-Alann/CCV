@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { PointerEvent, ReactNode } from "react";
+import type { PointerEvent, ReactNode, WheelEvent as ReactWheelEvent } from "react";
 import { readJsonResponse } from "@/lib/read-json-response";
 
 type ColumnReference = { entityId: string; columnId: string };
@@ -33,6 +33,8 @@ type ToolMode = "select" | "relation";
 const WORLD_W = 1500;
 const WORLD_H = 1000;
 const CARD_W = 310;
+const MIN_ZOOM = 0.35;
+const MAX_ZOOM = 2;
 const typeOptions = ["UUID", "VARCHAR(255)", "CHAR(1)", "TEXT", "SMALLINT", "INTEGER", "BIGINT", "SERIAL", "BIGSERIAL", "NUMERIC(10,2)", "REAL", "DOUBLE PRECISION", "BOOLEAN", "DATE", "TIME", "TIMESTAMP", "TIMESTAMPTZ", "JSON", "JSONB", "BYTEA"];
 
 function Icon({ name, size = 18 }: { name: string; size?: number }) {
@@ -416,7 +418,6 @@ export default function ErdEditor({ diagramId }: { diagramId: string }) {
   const [mode, setMode] = useState<ToolMode>("select");
   const [relationType, setRelationType] = useState("1 : N");
   const [linkPreview, setLinkPreview] = useState<LinkPreview | null>(null);
-  const [pendingManyToMany, setPendingManyToMany] = useState<{ from: string; to: string; fromPort: RelationPort; toPort: RelationPort } | null>(null);
   const [relationMessage, setRelationMessage] = useState("");
   const [zoom, setZoom] = useState(0.9);
   const [projectName, setProjectName] = useState("");
@@ -437,6 +438,9 @@ export default function ErdEditor({ diagramId }: { diagramId: string }) {
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const dragRef = useRef<{ id: string; target: "entity" | "decoration"; pointerId: number; x: number; y: number; originX: number; originY: number } | null>(null);
   const relationDragRef = useRef<{ from: string; fromPort: RelationPort; pointerId: number } | null>(null);
+  const touchPointersRef = useRef(new Map<number, { x: number; y: number }>());
+  const panRef = useRef<{ pointerId: number; x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
+  const pinchRef = useRef<{ distance: number; zoom: number; worldX: number; worldY: number } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -600,32 +604,74 @@ export default function ErdEditor({ diagramId }: { diagramId: string }) {
     setRelations((current) => [...current, relation]);
   };
 
-  const createJunctionTable = () => {
-    if (!pendingManyToMany) return;
-    const source = entities.find((entity) => entity.id === pendingManyToMany.from);
-    const target = entities.find((entity) => entity.id === pendingManyToMany.to);
-    if (!source || !target) { setPendingManyToMany(null); return; }
+  const createJunctionTable = (connection: { from: string; to: string; fromPort: RelationPort; toPort: RelationPort }) => {
+    const source = entities.find((entity) => entity.id === connection.from);
+    const target = entities.find((entity) => entity.id === connection.to);
+    if (!source || !target) return;
     const bridgeId = makeId();
     const bridgeName = uniqueJoinName(entities, `${singularize(source.name)}_${singularize(target.name)}`);
-    const firstRelation: Relation = { id: makeId(), from: source.id, to: bridgeId, label: "1 : N" };
-    const secondRelation: Relation = { id: makeId(), from: target.id, to: bridgeId, label: "1 : N" };
+    const firstRelation: Relation = { id: makeId(), from: source.id, to: bridgeId, label: "1 : N", fromPort: connection.fromPort };
+    const secondRelation: Relation = { id: makeId(), from: target.id, to: bridgeId, label: "1 : N", fromPort: connection.toPort };
     const emptyBridge: Entity = { id: bridgeId, name: bridgeName, x: 0, y: 0, columns: [] };
     const firstKeys = makeForeignKeyColumns(source, emptyBridge, firstRelation.id, { asPrimary: true });
     const secondKeys = makeForeignKeyColumns(target, { ...emptyBridge, columns: firstKeys ?? [] }, secondRelation.id, { asPrimary: true });
     if (!firstKeys || !secondKeys) {
       setRelationMessage("Hai bảng cần có khóa chính trước khi tạo bảng trung gian.");
-      setPendingManyToMany(null);
       return;
     }
+    const bridgeColumns = [...firstKeys, ...secondKeys];
+    const bridgeHeight = entityHeight({ ...emptyBridge, columns: bridgeColumns });
+    let placedSource = source;
+    let placedTarget = target;
+    const horizontalPorts = [connection.fromPort.side, connection.toPort.side].every((side) => side === "left" || side === "right");
+    const verticalPorts = [connection.fromPort.side, connection.toPort.side].every((side) => side === "top" || side === "bottom");
+    if (horizontalPorts) {
+      const distance = Math.abs(sideCenter(placedTarget, connection.toPort.side).x - sideCenter(placedSource, connection.fromPort.side).x);
+      const extraSpace = CARD_W + 36 - distance;
+      if (extraSpace > 0) {
+        const direction = Math.sign((target.x + CARD_W / 2) - (source.x + CARD_W / 2)) || (connection.fromPort.side === "right" ? 1 : -1);
+        const shift = extraSpace / 2;
+        const clampX = (x: number) => Math.max(0, Math.min(WORLD_W - CARD_W, x));
+        let sourceX = clampX(source.x - direction * shift);
+        let targetX = clampX(target.x + direction * shift);
+        let remaining = Math.max(0, extraSpace - direction * (source.x - sourceX + targetX - target.x));
+        const targetExtraX = clampX(targetX + direction * remaining);
+        remaining = Math.max(0, remaining - direction * (targetExtraX - targetX));
+        targetX = targetExtraX;
+        sourceX = clampX(sourceX - direction * remaining);
+        placedSource = { ...source, x: sourceX };
+        placedTarget = { ...target, x: targetX };
+      }
+    } else if (verticalPorts) {
+      const distance = Math.abs(sideCenter(placedTarget, connection.toPort.side).y - sideCenter(placedSource, connection.fromPort.side).y);
+      const extraSpace = bridgeHeight + 36 - distance;
+      if (extraSpace > 0) {
+        const direction = Math.sign((target.y + entityHeight(target) / 2) - (source.y + entityHeight(source) / 2)) || (connection.fromPort.side === "bottom" ? 1 : -1);
+        const shift = extraSpace / 2;
+        const clampY = (y: number, entity: Entity) => Math.max(0, Math.min(WORLD_H - entityHeight(entity), y));
+        let sourceY = clampY(source.y - direction * shift, source);
+        let targetY = clampY(target.y + direction * shift, target);
+        let remaining = Math.max(0, extraSpace - direction * (source.y - sourceY + targetY - target.y));
+        const targetExtraY = clampY(targetY + direction * remaining, target);
+        remaining = Math.max(0, remaining - direction * (targetExtraY - targetY));
+        targetY = targetExtraY;
+        sourceY = clampY(sourceY - direction * remaining, source);
+        placedSource = { ...source, y: sourceY };
+        placedTarget = { ...target, y: targetY };
+      }
+    }
+    const sourcePort = sideCenter(placedSource, connection.fromPort.side);
+    const targetPort = sideCenter(placedTarget, connection.toPort.side);
+    const centerX = (sourcePort.x + targetPort.x) / 2;
+    const centerY = (sourcePort.y + targetPort.y) / 2;
     const bridge: Entity = {
       ...emptyBridge,
-      x: Math.max(20, Math.min(WORLD_W - CARD_W - 20, (source.x + target.x) / 2)),
-      y: Math.max(20, Math.min(WORLD_H - 300, (source.y + target.y) / 2)),
-      columns: [...firstKeys, ...secondKeys],
+      x: Math.max(20, Math.min(WORLD_W - CARD_W - 20, centerX - CARD_W / 2)),
+      y: Math.max(20, Math.min(WORLD_H - bridgeHeight - 20, centerY - bridgeHeight / 2)),
+      columns: bridgeColumns,
     };
-    setEntities((current) => [...current, bridge]);
+    setEntities((current) => [...current.map((entity) => entity.id === placedSource.id ? placedSource : entity.id === placedTarget.id ? placedTarget : entity), bridge]);
     setRelations((current) => [...current, firstRelation, secondRelation]);
-    setPendingManyToMany(null);
     setMode("select");
   };
 
@@ -703,6 +749,65 @@ export default function ErdEditor({ diagramId }: { diagramId: string }) {
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
+  const zoomToAt = (nextZoom: number, clientX?: number, clientY?: number) => {
+    const viewport = viewportRef.current;
+    const next = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, nextZoom));
+    if (!viewport) { setZoom(next); return; }
+    const bounds = viewport.getBoundingClientRect();
+    const localX = (clientX ?? bounds.left + bounds.width / 2) - bounds.left;
+    const localY = (clientY ?? bounds.top + bounds.height / 2) - bounds.top;
+    const worldX = (viewport.scrollLeft + localX) / zoom;
+    const worldY = (viewport.scrollTop + localY) / zoom;
+    setZoom(next);
+    window.requestAnimationFrame(() => {
+      if (!viewport.isConnected) return;
+      viewport.scrollLeft = Math.max(0, worldX * next - localX);
+      viewport.scrollTop = Math.max(0, worldY * next - localY);
+    });
+  };
+
+  const onViewportPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== "touch") return;
+    const pointers = touchPointersRef.current;
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointers.size >= 2) {
+      const [first, second] = [...pointers.values()].slice(0, 2);
+      const bounds = event.currentTarget.getBoundingClientRect();
+      const localX = (first.x + second.x) / 2 - bounds.left;
+      const localY = (first.y + second.y) / 2 - bounds.top;
+      pinchRef.current = {
+        distance: Math.max(1, Math.hypot(second.x - first.x, second.y - first.y)),
+        zoom,
+        worldX: (event.currentTarget.scrollLeft + localX) / zoom,
+        worldY: (event.currentTarget.scrollTop + localY) / zoom,
+      };
+      panRef.current = null;
+      dragRef.current = null;
+      relationDragRef.current = null;
+      setLinkPreview(null);
+      event.preventDefault();
+      return;
+    }
+
+    const target = event.target as HTMLElement;
+    if (target.closest(".entity-card, .canvas-decoration, button, input, select, textarea")) return;
+    panRef.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      scrollLeft: event.currentTarget.scrollLeft,
+      scrollTop: event.currentTarget.scrollTop,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const onCanvasWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
+    if (!event.ctrlKey) return;
+    event.preventDefault();
+    const factor = event.deltaY < 0 ? 1.08 : 1 / 1.08;
+    zoomToAt(zoom * factor, event.clientX, event.clientY);
+  };
+
   const onCanvasPointerMove = (event: PointerEvent<HTMLDivElement>) => {
     const relationDrag = relationDragRef.current;
     if (relationDrag?.pointerId === event.pointerId) {
@@ -754,9 +859,9 @@ export default function ErdEditor({ diagramId }: { diagramId: string }) {
             const from = entities.find((entity) => entity.id === relationDrag.from);
             if (from && target && (!primaryColumns(from).length || !primaryColumns(target).length)) {
               setRelationMessage("Hãy đánh dấu khóa chính cho cả hai bảng trước khi nối N:M.");
-            } else if (target && toPort) {
-              setPendingManyToMany({ from: relationDrag.from, to, fromPort: relationDrag.fromPort, toPort });
               setMode("select");
+            } else if (target && toPort) {
+              createJunctionTable({ from: relationDrag.from, to, fromPort: relationDrag.fromPort, toPort });
             }
           } else if (target && toPort) {
             createRelation(relationDrag.from, to, relationType, { fromPort: relationDrag.fromPort, toPort });
@@ -767,6 +872,40 @@ export default function ErdEditor({ diagramId }: { diagramId: string }) {
       setLinkPreview(null);
     }
     if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null;
+  };
+
+  const onViewportPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "touch" && touchPointersRef.current.has(event.pointerId)) {
+      touchPointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      const pinch = pinchRef.current;
+      if (pinch && touchPointersRef.current.size >= 2) {
+        const [first, second] = [...touchPointersRef.current.values()].slice(0, 2);
+        const bounds = event.currentTarget.getBoundingClientRect();
+        const localX = (first.x + second.x) / 2 - bounds.left;
+        const localY = (first.y + second.y) / 2 - bounds.top;
+        const distance = Math.max(1, Math.hypot(second.x - first.x, second.y - first.y));
+        const nextZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, pinch.zoom * distance / pinch.distance));
+        setZoom(nextZoom);
+        window.requestAnimationFrame(() => {
+          const viewport = viewportRef.current;
+          if (!viewport?.isConnected) return;
+          viewport.scrollLeft = Math.max(0, pinch.worldX * nextZoom - localX);
+          viewport.scrollTop = Math.max(0, pinch.worldY * nextZoom - localY);
+        });
+      } else if (panRef.current?.pointerId === event.pointerId) {
+        const pan = panRef.current;
+        event.currentTarget.scrollLeft = pan.scrollLeft + pan.x - event.clientX;
+        event.currentTarget.scrollTop = pan.scrollTop + pan.y - event.clientY;
+      }
+    }
+    onCanvasPointerMove(event);
+  };
+
+  const onViewportPointerUp = (event: PointerEvent<HTMLDivElement>) => {
+    finishDrag(event);
+    touchPointersRef.current.delete(event.pointerId);
+    if (panRef.current?.pointerId === event.pointerId) panRef.current = null;
+    if (touchPointersRef.current.size < 2) pinchRef.current = null;
   };
 
   const exportHint = entities.length === 1 ? "1 bảng" : `${entities.length} bảng`;
@@ -840,9 +979,9 @@ export default function ErdEditor({ diagramId }: { diagramId: string }) {
           <span className="tool-divider" />
           <button className="tool-button arrange-button" onClick={arrangeEntities} title="Sắp xếp bảng" type="button"><Icon name="arrange" size={17} /><span>Sắp xếp</span></button>
           <div className="zoom-control">
-            <button type="button" className="icon-button" aria-label="Thu nhỏ" onClick={() => setZoom((current) => Math.max(0.55, Math.round((current - 0.1) * 100) / 100))}><Icon name="minus" size={16} /></button>
-            <button type="button" className="zoom-value" onClick={() => setZoom(0.9)}>{Math.round(zoom * 100)}%</button>
-            <button type="button" className="icon-button" aria-label="Phóng to" onClick={() => setZoom((current) => Math.min(1.4, Math.round((current + 0.1) * 100) / 100))}><Icon name="plus" size={16} /></button>
+            <button type="button" className="icon-button" aria-label="Thu nhỏ" onClick={() => zoomToAt(zoom - 0.1)}><Icon name="minus" size={16} /></button>
+            <button type="button" className="zoom-value" onClick={() => zoomToAt(0.9)}>{Math.round(zoom * 100)}%</button>
+            <button type="button" className="icon-button" aria-label="Phóng to" onClick={() => zoomToAt(zoom + 0.1)}><Icon name="plus" size={16} /></button>
           </div>
         </div>
       </section>
@@ -852,7 +991,7 @@ export default function ErdEditor({ diagramId }: { diagramId: string }) {
         {taskPromptExpanded && <p>{taskPrompt.description}</p>}
       </aside>}
 
-      <main className={`canvas-viewport ${mode === "relation" ? "link-mode" : ""}`} ref={viewportRef} onPointerMove={onCanvasPointerMove} onPointerUp={finishDrag} onPointerCancel={finishDrag}>
+      <main className={`canvas-viewport ${mode === "relation" ? "link-mode" : ""}`} aria-label="Bản vẽ ERD. Kéo nền để di chuyển, dùng hai ngón tay để thu phóng." ref={viewportRef} onPointerDown={onViewportPointerDown} onPointerMove={onViewportPointerMove} onPointerUp={onViewportPointerUp} onPointerCancel={onViewportPointerUp} onWheel={onCanvasWheel}>
         <div className="canvas-stage" style={{ width: WORLD_W * zoom, height: WORLD_H * zoom }}>
           <div className={`canvas-world ${gridVisible ? "grid-on" : ""}`} style={{ width: WORLD_W, height: WORLD_H, transform: `scale(${zoom})` }}>
             <svg className="relations-layer" width={WORLD_W} height={WORLD_H} aria-label="Các quan hệ giữa bảng">
@@ -1065,11 +1204,15 @@ export default function ErdEditor({ diagramId }: { diagramId: string }) {
                 boxShadow: `0 0 0 3px ${relationType === "1 : 1" ? "rgba(22,163,74,.25)" : relationType === "1 : N" ? "rgba(124,58,237,.25)" : "rgba(219,39,119,.25)"}`,
               }}
             />
-            Kéo từ bảng nguồn sang bảng đích để nối · <strong style={{ color: relationType === "1 : 1" ? "#15803d" : relationType === "1 : N" ? "#6d28d9" : "#be185d" }}>{relationType} ({relationType === "1 : 1" ? "Xanh lá" : relationType === "1 : N" ? "Tím" : "Hồng"})</strong>
+            {relationType === "N : M" ? "Kéo bảng nguồn sang bảng đích để tự tạo bảng trung gian · " : "Kéo từ bảng nguồn sang bảng đích để nối · "}<strong style={{ color: relationType === "1 : 1" ? "#15803d" : relationType === "1 : N" ? "#6d28d9" : "#be185d" }}>{relationType} ({relationType === "1 : 1" ? "Xanh lá" : relationType === "1 : N" ? "Tím" : "Hồng"})</strong>
             <button type="button" aria-label="Thoát chế độ tạo quan hệ" onClick={() => { setMode("select"); relationDragRef.current = null; setLinkPreview(null); }}><Icon name="close" size={15} /></button>
           </div>
         )}
         <div className="canvas-controls">
+          <button type="button" className="canvas-control" aria-label="Thu nhỏ sơ đồ" title="Thu nhỏ" onClick={() => zoomToAt(zoom - 0.1)}><Icon name="minus" size={16} /></button>
+          <button type="button" className="canvas-zoom-value" aria-label="Đặt lại độ thu phóng" title="Đặt lại về 90%" onClick={() => zoomToAt(0.9)}>{Math.round(zoom * 100)}%</button>
+          <button type="button" className="canvas-control" aria-label="Phóng to sơ đồ" title="Phóng to" onClick={() => zoomToAt(zoom + 0.1)}><Icon name="plus" size={16} /></button>
+          <span className="control-separator" />
           <button type="button" className={`canvas-control ${gridVisible ? "selected" : ""}`} title="Bật/tắt lưới" onClick={() => setGridVisible((visible) => !visible)}><Icon name="grid" size={16} /></button>
           <span className="control-separator" />
           <button type="button" className="fit-control" onClick={() => { setZoom(0.9); viewportRef.current?.scrollTo({ left: 0, top: 0, behavior: "smooth" }); }}>Vừa khung</button>
@@ -1097,19 +1240,6 @@ export default function ErdEditor({ diagramId }: { diagramId: string }) {
             <span>{exportTarget === "mongodb" ? "Tệp mongosh · .js" : "Tệp SQL · .sql"}</span>
             <div><button type="button" className="copy-button" onClick={copyExport}><Icon name={exportCopied ? "check" : "copy"} size={15} />{exportCopied ? "Đã sao chép" : "Sao chép"}</button><button type="button" className="share-button" onClick={downloadExport}><Icon name="download" size={15} /> Tải tệp</button></div>
           </footer>
-        </section>
-      </div>}
-
-      {pendingManyToMany && <div className="create-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setPendingManyToMany(null); }}>
-        <section className="create-dialog junction-dialog" role="dialog" aria-modal="true" aria-labelledby="junction-title">
-          <button type="button" className="create-close" aria-label="Đóng" onClick={() => setPendingManyToMany(null)}>×</button>
-          <div className="create-dialog-icon"><Icon name="relation" size={20} /></div>
-          <h2 id="junction-title">Quan hệ nhiều–nhiều</h2>
-          <p>Tạo bảng trung gian với hai khóa ngoại ghép thành khóa chính. Sơ đồ sẽ giữ cả hai đường nối 1–N qua bảng này.</p>
-          <div className="create-dialog-actions junction-actions">
-            <button type="button" className="cancel-create" onClick={() => { createRelation(pendingManyToMany.from, pendingManyToMany.to, "N : M", { fromPort: pendingManyToMany.fromPort, toPort: pendingManyToMany.toPort }); setPendingManyToMany(null); }}>Giữ quan hệ N:M</button>
-            <button type="button" className="create-diagram-button" onClick={createJunctionTable}>Tạo bảng trung gian</button>
-          </div>
         </section>
       </div>}
 

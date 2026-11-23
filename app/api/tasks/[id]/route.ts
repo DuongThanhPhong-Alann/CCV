@@ -1,4 +1,5 @@
 import { ObjectId } from "mongodb";
+import { deleteAppDocument, findAppDocument, listAppDocuments, patchAppDocument, writeAppDocument, type AppDocument } from "@/lib/app-data";
 import { currentOwnerId } from "@/lib/current-user";
 import { getDatabase } from "@/lib/mongodb";
 
@@ -23,6 +24,7 @@ type AssignmentDoc = {
   assignedToId?: ObjectId;
   assignedToName?: string;
   assignedToEmail?: string;
+  sourceTaskId?: ObjectId;
   status: "draft" | "invited" | "accepted" | "declined";
   diagramId?: ObjectId;
   acceptedAt?: Date;
@@ -43,6 +45,7 @@ function serializeTask(task: AssignmentDoc & { _id: ObjectId }) {
     assignedToId: task.assignedToId?.toString() ?? null,
     assignedToName: task.assignedToName ?? null,
     assignedToEmail: task.assignedToEmail ?? null,
+    sourceTaskId: task.sourceTaskId?.toString() ?? null,
     status: task.status,
     diagramId: task.diagramId?.toString() ?? null,
     acceptedAt: task.acceptedAt ?? null,
@@ -55,10 +58,9 @@ function serializeTask(task: AssignmentDoc & { _id: ObjectId }) {
 
 async function loadAuthorizedTask(id: string, ownerId: ObjectId) {
   if (!/^[0-9a-f]{24}$/i.test(id)) return null;
-  return getDatabase().collection<AssignmentDoc>("tasks").findOne({
-    _id: new ObjectId(id),
-    $or: [{ createdById: ownerId }, { assignedToId: ownerId }],
-  });
+  const task = await findAppDocument<AssignmentDoc & AppDocument>("tasks", id, () => getDatabase().collection<AssignmentDoc>("tasks").findOne({ _id: new ObjectId(id) }));
+  if (!task || (!task.createdById.equals(ownerId) && !task.assignedToId?.equals(ownerId))) return null;
+  return task;
 }
 
 export async function GET(_request: Request, { params }: RouteContext) {
@@ -69,9 +71,34 @@ export async function GET(_request: Request, { params }: RouteContext) {
   try {
     const task = await loadAuthorizedTask(id, ownerId);
     if (!task) return Response.json({ error: "Không tìm thấy bài tập." }, { status: 404 });
-    return Response.json({ task: serializeTask(task), viewerRole: task.createdById.equals(ownerId) ? "creator" : "assignee" });
+    const isCreator = task.createdById.equals(ownerId);
+    const deliveries = isCreator && task.status === "draft"
+      ? await listAppDocuments<AssignmentDoc & AppDocument>("tasks", { sourceId: task._id.toString(), ownerId: ownerId.toString() }, () => getDatabase().collection<AssignmentDoc>("tasks")
+          .find({ sourceTaskId: task._id, createdById: ownerId }, { projection: {
+            title: 1, description: 1, createdById: 1, createdByName: 1, createdByEmail: 1,
+            assignedToId: 1, assignedToName: 1, assignedToEmail: 1, sourceTaskId: 1,
+            status: 1, diagramId: 1, "submission.version": 1, "submission.submittedAt": 1,
+            "grade.score": 1, "grade.submissionVersion": 1, createdAt: 1, updatedAt: 1,
+          } }).sort({ updatedAt: -1 }).toArray())
+      : [];
+    return Response.json({
+      task: {
+        ...serializeTask(task),
+        assignedCount: deliveries.length,
+        deliveries: deliveries.map((delivery) => ({
+          id: delivery._id.toString(),
+          assignedToName: delivery.assignedToName ?? null,
+          assignedToEmail: delivery.assignedToEmail ?? null,
+          status: delivery.status,
+          submission: delivery.submission ? { version: delivery.submission.version, submittedAt: delivery.submission.submittedAt } : null,
+          grade: delivery.grade ? { score: delivery.grade.score, submissionVersion: delivery.grade.submissionVersion } : null,
+          updatedAt: delivery.updatedAt,
+        })),
+      },
+      viewerRole: isCreator ? "creator" : "assignee",
+    });
   } catch {
-    return Response.json({ error: "Không thể tải bài tập. Kiểm tra kết nối MongoDB." }, { status: 503 });
+    return Response.json({ error: "Không thể tải bài tập. Kiểm tra kết nối Supabase hoặc MongoDB." }, { status: 503 });
   }
 }
 
@@ -89,12 +116,29 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   }
 
   try {
-    const database = getDatabase();
-    const tasks = database.collection<AssignmentDoc>("tasks");
     const task = await loadAuthorizedTask(id, ownerId);
     if (!task) return Response.json({ error: "Không tìm thấy bài tập." }, { status: 404 });
     const taskId = new ObjectId(id);
     const action = body.action;
+
+    if (action === "saveAsDraft") {
+      if (!task.createdById.equals(ownerId)) return Response.json({ error: "Chỉ người giao bài mới có thể lưu đề vào kho." }, { status: 403 });
+      if (task.status === "draft") return Response.json({ ok: true, id: taskId.toString() });
+      const now = new Date();
+      const draftId = new ObjectId();
+      await writeAppDocument("tasks", {
+        _id: draftId,
+        title: task.title,
+        description: task.description,
+        createdById: task.createdById,
+        createdByName: task.createdByName,
+        createdByEmail: task.createdByEmail,
+        status: "draft",
+        createdAt: now,
+        updatedAt: now,
+      });
+      return Response.json({ ok: true, id: draftId.toString() }, { status: 201 });
+    }
 
     if (action === "assign") {
       if (!task.createdById.equals(ownerId)) return Response.json({ error: "Chỉ người tạo đề mới có thể giao bài." }, { status: 403 });
@@ -104,17 +148,28 @@ export async function PATCH(request: Request, { params }: RouteContext) {
         : null;
       if (!recipientId) return Response.json({ error: "Hãy chọn một tài khoản nhận bài." }, { status: 400 });
       if (recipientId.equals(ownerId)) return Response.json({ error: "Bạn không thể giao bài cho chính mình." }, { status: 400 });
-      const recipient = await database.collection<{ _id: ObjectId; name?: string; email?: string }>("users")
-        .findOne({ _id: recipientId }, { projection: { _id: 1, name: 1, email: 1 } });
+      const recipient = await findAppDocument<AppDocument & { name?: string; email?: string }>("users", recipientId.toString(), () => getDatabase().collection<{ _id: ObjectId; name?: string; email?: string }>("users")
+        .findOne({ _id: recipientId }, { projection: { _id: 1, name: 1, email: 1 } }));
       if (!recipient?.email) return Response.json({ error: "Tài khoản nhận không còn tồn tại." }, { status: 404 });
 
       const now = new Date();
-      const result = await tasks.updateOne(
-        { _id: taskId, createdById: ownerId, status: "draft" },
-        { $set: { assignedToId: recipient._id, assignedToName: recipient.name || recipient.email, assignedToEmail: recipient.email, status: "invited", updatedAt: now } },
-      );
-      if (!result.modifiedCount) return Response.json({ error: "Đề bài vừa được giao hoặc thay đổi ở nơi khác. Hãy tải lại trang." }, { status: 409 });
-      return Response.json({ ok: true });
+      const assignmentId = new ObjectId();
+      await writeAppDocument("tasks", {
+        _id: assignmentId,
+        title: task.title,
+        description: task.description,
+        createdById: task.createdById,
+        createdByName: task.createdByName,
+        createdByEmail: task.createdByEmail,
+        assignedToId: recipient._id,
+        assignedToName: recipient.name || recipient.email,
+        assignedToEmail: recipient.email,
+        sourceTaskId: taskId,
+        status: "invited",
+        createdAt: now,
+        updatedAt: now,
+      });
+      return Response.json({ ok: true, id: assignmentId.toString() }, { status: 201 });
     }
 
     if (action === "accept") {
@@ -123,7 +178,9 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       if (task.status !== "invited") return Response.json({ error: "Lời mời này đã được xử lý." }, { status: 409 });
 
       const now = new Date();
-      const diagram = await database.collection("diagrams").insertOne({
+      const diagramId = new ObjectId();
+      await writeAppDocument("diagrams", {
+        _id: diagramId,
         ownerId,
         name: task.title,
         taskId,
@@ -133,32 +190,23 @@ export async function PATCH(request: Request, { params }: RouteContext) {
         createdAt: now,
         updatedAt: now,
       });
-      let updated;
-      try {
-        updated = await tasks.updateOne(
-          { _id: taskId, assignedToId: ownerId, status: "invited" },
-          { $set: { status: "accepted", diagramId: diagram.insertedId, acceptedAt: now, updatedAt: now } },
-        );
-      } catch (error) {
-        await database.collection("diagrams").deleteOne({ _id: diagram.insertedId, ownerId, taskId });
-        throw error;
-      }
-      if (!updated.modifiedCount) {
-        await database.collection("diagrams").deleteOne({ _id: diagram.insertedId, ownerId, taskId });
-        const latest = await tasks.findOne({ _id: taskId, assignedToId: ownerId });
+      const updated = await patchAppDocument("tasks", taskId.toString(), { status: "accepted", diagramId, acceptedAt: now, updatedAt: now }, { status: "invited", assignedToId: ownerId.toString() });
+      if (!updated.updated) {
+        await deleteAppDocument("diagrams", diagramId.toString());
+        const latest = await loadAuthorizedTask(taskId.toString(), ownerId);
         if (latest?.status === "accepted" && latest.diagramId) return Response.json({ ok: true, diagramId: latest.diagramId.toString() });
         return Response.json({ error: "Bài tập vừa được xử lý ở nơi khác. Hãy tải lại trang." }, { status: 409 });
       }
-      return Response.json({ ok: true, diagramId: diagram.insertedId.toString() });
+      return Response.json({ ok: true, diagramId: diagramId.toString() });
     }
 
     if (action === "decline") {
       if (!task.assignedToId?.equals(ownerId)) return Response.json({ error: "Chỉ người nhận mới có thể từ chối bài." }, { status: 403 });
       if (task.status === "declined") return Response.json({ ok: true });
       if (task.status !== "invited") return Response.json({ error: "Bài tập đã được chấp nhận, không thể từ chối." }, { status: 409 });
-      const result = await tasks.updateOne({ _id: taskId, assignedToId: ownerId, status: "invited" }, { $set: { status: "declined", updatedAt: new Date() } });
-      if (result.modifiedCount) return Response.json({ ok: true });
-      const latest = await tasks.findOne({ _id: taskId, assignedToId: ownerId }, { projection: { status: 1 } });
+      const updated = await patchAppDocument("tasks", taskId.toString(), { status: "declined", updatedAt: new Date() }, { status: "invited", assignedToId: ownerId.toString() });
+      if (updated.updated) return Response.json({ ok: true });
+      const latest = await loadAuthorizedTask(taskId.toString(), ownerId);
       if (latest?.status === "declined") return Response.json({ ok: true });
       return Response.json({ error: "Bài tập vừa được chấp nhận ở nơi khác." }, { status: 409 });
     }
@@ -166,8 +214,8 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     if (action === "submit") {
       if (!task.assignedToId?.equals(ownerId)) return Response.json({ error: "Chỉ người nhận mới có thể nộp bài." }, { status: 403 });
       if (task.status !== "accepted" || !task.diagramId) return Response.json({ error: "Hãy chấp nhận bài tập trước khi nộp." }, { status: 409 });
-      const diagram = await database.collection("diagrams").findOne({ _id: task.diagramId, ownerId, taskId });
-      if (!diagram) return Response.json({ error: "Không tìm thấy sơ đồ của bài tập." }, { status: 404 });
+      const diagram = await findAppDocument<AppDocument & { ownerId: ObjectId; taskId: ObjectId; name?: string; entities?: unknown[]; relations?: unknown[]; decorations?: unknown[] }>("diagrams", task.diagramId.toString(), () => getDatabase().collection("diagrams").findOne({ _id: task.diagramId, ownerId, taskId }));
+      if (!diagram || !diagram.ownerId.equals(ownerId) || !diagram.taskId.equals(taskId)) return Response.json({ error: "Không tìm thấy sơ đồ của bài tập." }, { status: 404 });
 
       const snapshot: Snapshot = {
         version: (task.submission?.version ?? 0) + 1,
@@ -179,14 +227,12 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       };
       if (JSON.stringify(snapshot).length > 8_000_000) return Response.json({ error: "Bài nộp vượt quá dung lượng cho phép." }, { status: 413 });
 
-      const submissionGuard = task.submission
-        ? { "submission.version": task.submission.version }
-        : { submission: { $exists: false } };
-      const result = await tasks.updateOne(
-        { _id: taskId, assignedToId: ownerId, status: "accepted", ...submissionGuard },
-        { $set: { submission: snapshot, grade: null, updatedAt: snapshot.submittedAt } },
-      );
-      if (!result.modifiedCount) return Response.json({ error: "Bài nộp vừa được cập nhật ở nơi khác. Hãy tải lại trang." }, { status: 409 });
+      const updated = await patchAppDocument("tasks", taskId.toString(), { submission: snapshot, grade: null, updatedAt: snapshot.submittedAt }, {
+        status: "accepted",
+        assignedToId: ownerId.toString(),
+        submissionVersion: task.submission?.version ?? null,
+      });
+      if (!updated.updated) return Response.json({ error: "Bài nộp vừa được cập nhật ở nơi khác. Hãy tải lại trang." }, { status: 409 });
       return Response.json({ ok: true, version: snapshot.version, submittedAt: snapshot.submittedAt });
     }
 
@@ -200,16 +246,16 @@ export async function PATCH(request: Request, { params }: RouteContext) {
 
       const gradedAt = new Date();
       const grade = { score, feedback, gradedAt, submissionVersion: task.submission.version };
-      const result = await tasks.updateOne(
-        { _id: taskId, createdById: ownerId, "submission.version": task.submission.version },
-        { $set: { grade, updatedAt: gradedAt } },
-      );
-      if (!result.modifiedCount) return Response.json({ error: "Bài nộp vừa thay đổi. Hãy tải lại trước khi chấm." }, { status: 409 });
+      const updated = await patchAppDocument("tasks", taskId.toString(), { grade, updatedAt: gradedAt }, {
+        createdById: ownerId.toString(),
+        submissionVersion: task.submission.version,
+      });
+      if (!updated.updated) return Response.json({ error: "Bài nộp vừa thay đổi. Hãy tải lại trước khi chấm." }, { status: 409 });
       return Response.json({ ok: true, grade });
     }
 
     return Response.json({ error: "Thao tác không hợp lệ." }, { status: 400 });
   } catch {
-    return Response.json({ error: "Không thể cập nhật bài tập. Kiểm tra kết nối MongoDB." }, { status: 503 });
+    return Response.json({ error: "Không thể cập nhật bài tập trong Supabase hoặc MongoDB." }, { status: 503 });
   }
 }

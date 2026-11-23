@@ -1,11 +1,10 @@
-import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import bcrypt from "bcryptjs";
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { getDatabase, getMongoClient } from "@/lib/mongodb";
+import { listAppDocuments, type AppDocument } from "@/lib/app-data";
+import { getDatabase } from "@/lib/mongodb";
 
 export const authOptions: NextAuthOptions = {
-  adapter: MongoDBAdapter(() => getMongoClient(), { databaseName: process.env.MONGODB_DB || "erd_studio" }),
   secret: process.env.NEXTAUTH_SECRET,
   session: { strategy: "jwt", maxAge: 7 * 24 * 60 * 60 },
   pages: { signIn: "/login" },
@@ -22,14 +21,14 @@ export const authOptions: NextAuthOptions = {
         if (!email || !password) return null;
 
         try {
-          const user = await getDatabase().collection("users").findOne<{
-            _id: import("mongodb").ObjectId;
-            name: string;
-            email: string;
-            passwordHash: string;
-          }>({ email });
-          if (!user?.passwordHash || !(await bcrypt.compare(password, user.passwordHash))) return null;
-          return { id: user._id.toString(), name: user.name, email: user.email };
+          const matches = await listAppDocuments<AppDocument & {
+            name?: string;
+            email?: string;
+            passwordHash?: string;
+          }>("users", { email }, () => getDatabase().collection("users").find({ email }).limit(1).toArray(), 1);
+          const user = matches[0];
+          if (!user || typeof user.passwordHash !== "string" || !(await bcrypt.compare(password, user.passwordHash))) return null;
+          return { id: user._id.toString(), name: user.name || user.email || "Người dùng", email: user.email || email };
         } catch {
           return null;
         }

@@ -16,7 +16,7 @@ function formatDate(value: string) {
 }
 
 function taskState(task: AssignmentTask, scope: TaskScope) {
-  if (task.status === "draft") return { label: "Bản nháp", tone: "draft" };
+  if (task.status === "draft") return { label: "Trong kho", tone: "draft" };
   if (task.status === "declined") return { label: "Đã từ chối", tone: "declined" };
   if (task.status === "invited") return scope === "received"
     ? { label: "Chờ bạn phản hồi", tone: "waiting" }
@@ -128,7 +128,7 @@ export default function TasksWorkspace() {
           📥 Được giao <span className="tab-counter">{received.length}</span>
         </button>
         <button className={scope === "drafts" ? "active" : ""} type="button" role="tab" aria-selected={scope === "drafts"} onClick={() => setScope("drafts")}>
-          📝 Bản nháp <span className="tab-counter">{drafts.length}</span>
+          📝 Kho đề <span className="tab-counter">{drafts.length}</span>
         </button>
         <button className={scope === "sent" ? "active" : ""} type="button" role="tab" aria-selected={scope === "sent"} onClick={() => setScope("sent")}>
           📤 Đã giao <span className="tab-counter">{sent.length}</span>
@@ -142,7 +142,7 @@ export default function TasksWorkspace() {
             const personLabel = scope === "received"
               ? `Người giao: ${task.createdByName} (${task.createdByEmail})`
               : scope === "drafts"
-                ? "Chưa giao · Mở chi tiết để chọn tài khoản nhận"
+                ? "Kho đề bài · Có thể giao nhiều lần"
                 : `Người nhận: ${task.assignedToName || "Chưa có"} (${task.assignedToEmail || "—"})`;
             const icon = scope === "received" ? "📥" : scope === "drafts" ? "📝" : "📤";
 
@@ -163,6 +163,9 @@ export default function TasksWorkspace() {
                     {task.submission && (
                       <span className="task-sub-count">📄 Bản nộp v{task.submission.version}</span>
                     )}
+                    {scope === "drafts" && (
+                      <span className="task-sub-count">↗ {task.assignedCount ?? 0} lượt giao</span>
+                    )}
                     {task.grade && (
                       <span className="task-grade-pill">⭐️ {task.grade.score}/10 điểm</span>
                     )}
@@ -176,8 +179,8 @@ export default function TasksWorkspace() {
       ) : (
         <section className="tasks-empty">
           <div className="tasks-empty-icon">{scope === "received" ? "📥" : scope === "drafts" ? "📝" : "📤"}</div>
-          <h2>{scope === "received" ? "Chưa có bài tập nào được giao cho bạn" : scope === "drafts" ? "Chưa có đề bài nháp nào" : "Bạn chưa giao bài tập nào"}</h2>
-          <p>{scope === "received" ? "Khi người khác giao bài tập cho tài khoản của bạn, thông báo và lời mời sẽ xuất hiện ở đây." : scope === "drafts" ? "Tạo và lưu các đề bài ở đây, sau đó mở chi tiết để chọn người nhận khi sẵn sàng." : "Các bài bạn đã giao cho học viên/thành viên khác sẽ hiển thị tại đây."}</p>
+          <h2>{scope === "received" ? "Chưa có bài tập nào được giao cho bạn" : scope === "drafts" ? "Kho đề bài đang trống" : "Bạn chưa giao bài tập nào"}</h2>
+          <p>{scope === "received" ? "Khi người khác giao bài tập cho tài khoản của bạn, thông báo và lời mời sẽ xuất hiện ở đây." : scope === "drafts" ? "Tạo đề một lần, lưu trong kho rồi giao cho nhiều học viên hoặc giao lại bất cứ lúc nào." : "Các lượt bài tập đã giao sẽ hiển thị tại đây."}</p>
           {scope !== "received" && (
             <button className="create-diagram-button" type="button" onClick={() => setShowCreate(true)}>
               ＋ Tạo đề bài ngay

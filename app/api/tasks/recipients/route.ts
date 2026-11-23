@@ -1,4 +1,5 @@
 import { ObjectId } from "mongodb";
+import { listAppDocuments, type AppDocument } from "@/lib/app-data";
 import { currentOwnerId } from "@/lib/current-user";
 import { getDatabase } from "@/lib/mongodb";
 
@@ -15,11 +16,12 @@ export async function GET(request: Request) {
   const pattern = new RegExp(escaped, "i");
 
   try {
-    const accounts = await getDatabase().collection<{ _id: ObjectId; name?: string; email?: string }>("users")
+    const accounts = await listAppDocuments<AppDocument & { name?: string; email?: string }>("users", {
+      excludeId: ownerId.toString(),
+      nameOrEmailContains: query,
+    }, () => getDatabase().collection<{ _id: ObjectId; name?: string; email?: string }>("users")
       .find({ _id: { $ne: ownerId }, $or: [{ name: pattern }, { email: pattern }] }, { projection: { _id: 1, name: 1, email: 1 } })
-      .sort({ name: 1, email: 1 })
-      .limit(20)
-      .toArray();
+      .sort({ name: 1, email: 1 }).limit(20).toArray(), 20);
 
     return Response.json({ accounts: accounts.filter((account) => account.email).map((account) => ({
       id: account._id.toString(),
@@ -27,6 +29,6 @@ export async function GET(request: Request) {
       email: account.email,
     })) });
   } catch {
-    return Response.json({ error: "Không thể tìm tài khoản. Kiểm tra kết nối MongoDB." }, { status: 503 });
+    return Response.json({ error: "Không thể tìm tài khoản. Kiểm tra kết nối Supabase hoặc MongoDB." }, { status: 503 });
   }
 }

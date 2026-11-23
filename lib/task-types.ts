@@ -20,6 +20,16 @@ export type TaskGrade = {
   submissionVersion: number;
 };
 
+export type TaskDelivery = {
+  id: string;
+  assignedToName: string | null;
+  assignedToEmail: string | null;
+  status: TaskStatus;
+  submission: { version: number; submittedAt?: string } | null;
+  grade: { score: number; submissionVersion: number } | null;
+  updatedAt: string;
+};
+
 export type AssignmentTask = {
   id: string;
   title: string;
@@ -30,6 +40,9 @@ export type AssignmentTask = {
   assignedToId: string | null;
   assignedToName: string | null;
   assignedToEmail: string | null;
+  sourceTaskId?: string | null;
+  assignedCount?: number;
+  deliveries?: TaskDelivery[];
   status: TaskStatus;
   diagramId: string | null;
   acceptedAt?: string | null;
