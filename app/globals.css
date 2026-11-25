@@ -713,3 +713,108 @@ button { color: inherit; }
   .task-delivery-row { align-items: flex-start; flex-wrap: wrap; gap: 7px 10px; }
   .task-delivery-row > span:first-child { flex: 1 1 100%; }
 }
+
+/* ─── Closure & Superkey Teaching Board ──────────────────── */
+.closure-page { min-height: 100dvh; color: var(--ink); background: var(--canvas); }
+.closure-content { width: min(1040px, calc(100% - 48px)); margin: 0 auto; padding: 36px 0 60px; }
+.closure-heading { display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 2px solid var(--line); }
+.closure-heading h1 { margin: 8px 0 5px; color: #111827; font: 800 26px 'Manrope', sans-serif; letter-spacing: -.5px; }
+.closure-heading p { margin: 0; color: #64748b; font-size: 13px; }
+
+.closure-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.closure-preset-select, .closure-btn { height: 36px; padding: 0 12px; border: 1.5px solid #cbd5e1; border-radius: 8px; color: #334155; background: #fff; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s; }
+.closure-preset-select:hover, .closure-btn:hover { border-color: #93c5fd; color: #1d4ed8; background: #eff6ff; }
+.closure-btn.active { border-color: #2563eb; color: #fff; background: #1d4ed8; }
+.closure-btn-primary { border-color: #2563eb; color: #fff; background: #2563eb; }
+.closure-btn-primary:hover { border-color: #1d4ed8; color: #fff; background: #1d4ed8; }
+
+.closure-sheet { display: flex; flex-direction: column; gap: 26px; padding: 32px 36px; border: 1.5px solid #dbe4ee; border-top: 4px solid #2563eb; border-radius: 14px; background: #fff; box-shadow: var(--s1); font-size: 15px; line-height: 1.7; }
+
+.closure-problem-box { display: flex; flex-direction: column; gap: 10px; padding: 18px 22px; border: 1.5px solid #bfdbfe; border-left: 4.5px solid #2563eb; border-radius: 10px; background: #f8fbff; }
+.closure-problem-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: #0f172a; }
+.math-wrap { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; color: #1e3a8a; }
+
+.closure-inline-input { height: 32px; padding: 0 10px; border: 1.5px dashed #cbd5e1; border-radius: 6px; color: #0f172a; background: #fff; font-size: 14px; font-weight: 600; outline: 0; transition: border-color .15s, box-shadow .15s; }
+.closure-inline-input:focus { border-style: solid; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+.closure-input-schema { width: 170px; }
+.closure-input-fds { width: 260px; }
+.closure-input-wide { flex: 1 1 320px; min-width: 240px; }
+.closure-input-attrs { width: 190px; }
+.closure-input-target { width: 76px; text-align: center; font-weight: 700; color: #1d4ed8; }
+.closure-input-count { width: 64px; text-align: center; font-weight: 800; color: #1d4ed8; }
+.closure-input-strong { color: #1d4ed8; font-weight: 700; }
+.closure-input-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13.5px; }
+
+.closure-step { display: flex; flex-direction: column; gap: 12px; padding-top: 18px; border-top: 1.5px solid #edf1f6; }
+.closure-step-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.closure-step-header h2 { margin: 0; color: #0f172a; font: 800 17px 'Manrope', sans-serif; }
+.closure-step-helper { padding: 5px 11px; border: 1.5px solid #bfdbfe; border-radius: 7px; color: #1d4ed8; background: #eff6ff; font-size: 11px; font-weight: 700; cursor: pointer; transition: all .15s; }
+.closure-step-helper:hover { background: #dbeafe; }
+
+.closure-step1-lines { display: flex; flex-direction: column; gap: 8px; }
+.closure-step1-lines p { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; }
+.closure-highlight-line { padding: 8px 12px; border-radius: 8px; background: #f8fafc; font-weight: 600; }
+
+.closure-blocks-stack { display: flex; flex-direction: column; gap: 22px; }
+.closure-block { display: flex; flex-direction: column; gap: 10px; }
+.closure-block-bar { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 700; color: #475569; }
+.closure-row-delete { padding: 3px 9px; border: 1px solid #fecaca; border-radius: 6px; color: #b91c1c; background: #fff1f2; font-size: 11px; font-weight: 600; cursor: pointer; }
+
+.closure-quick-fds { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.quick-fds-label { color: #64748b; font-size: 11px; font-weight: 600; margin-right: 2px; }
+.closure-mini-chip { padding: 4px 10px; border: 1px solid #cbd5e1; border-radius: 99px; color: #1e40af; background: #f8fafc; font-size: 11px; font-weight: 700; cursor: pointer; transition: all .15s; }
+.closure-mini-chip:hover { border-color: #93c5fd; background: #eff6ff; }
+
+.closure-table-wrap { overflow-x: auto; border: 1.5px solid #cbd5e1; border-radius: 10px; }
+.closure-table { width: 100%; border-collapse: collapse; background: #fff; }
+.closure-table th { padding: 10px 12px; border-bottom: 1.5px solid #cbd5e1; border-right: 1px solid #e2e8f0; color: #1e293b; background: #f1f5f9; font: 700 13px 'Manrope', sans-serif; text-align: left; }
+.closure-table th:last-child { border-right: 0; }
+.closure-table td { padding: 6px 8px; border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; vertical-align: middle; }
+.closure-table td:last-child { border-right: 0; }
+
+.closure-table-input { width: 100%; height: 34px; padding: 0 9px; border: 1px solid transparent; border-radius: 6px; color: #0f172a; background: transparent; font-size: 14px; font-weight: 500; outline: 0; transition: all .15s; }
+.closure-table-input:hover { background: #f8fafc; border-color: #e2e8f0; }
+.closure-table-input:focus { background: #fff; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+.closure-input-center { text-align: center; font-weight: 700; color: #334155; }
+.closure-cell-actions { text-align: center; }
+.closure-row-remove { width: 26px; height: 26px; border: 0; border-radius: 6px; color: #94a3b8; background: transparent; font-size: 16px; cursor: pointer; }
+.closure-row-remove:hover:not(:disabled) { color: #b91c1c; background: #fff1f2; }
+.closure-row-remove:disabled { opacity: .3; cursor: not-allowed; }
+
+.closure-table-footer { display: flex; justify-content: flex-start; }
+.closure-add-row-btn { padding: 6px 13px; border: 1.5px dashed #93c5fd; border-radius: 8px; color: #1d4ed8; background: #f8fbff; font-size: 12px; font-weight: 700; cursor: pointer; transition: all .15s; }
+.closure-add-row-btn:hover { border-style: solid; background: #eff6ff; }
+
+.closure-step2-conclusion { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; padding: 12px 14px; border-radius: 9px; background: #f8fafc; border: 1px solid #e2e8f0; }
+.closure-formula-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
+.closure-eq-toggle { height: 32px; padding: 0 11px; border: 1.5px solid; border-radius: 6px; font-size: 13px; font-weight: 800; cursor: pointer; }
+.closure-eq-toggle.is-eq { border-color: #86efac; color: #15803d; background: #f0fdf4; }
+.closure-eq-toggle.is-neq { border-color: #fca5a5; color: #b91c1c; background: #fff1f2; }
+.closure-explanation-input { width: 100%; height: 32px; padding: 0 8px; border: 1px dashed transparent; border-radius: 6px; color: #334155; background: transparent; font-size: 14px; outline: 0; }
+.closure-explanation-input:hover { border-color: #cbd5e1; background: #fff; }
+.closure-explanation-input:focus { border-style: solid; border-color: #2563eb; background: #fff; }
+
+.closure-rule-note { margin: 4px 0 0; color: #475569; font-size: 13.5px; font-style: italic; }
+.closure-step4-intro { margin: 0; color: #1e293b; }
+
+.superkey-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.superkey-cell { display: inline-flex; align-items: center; border: 1.5px solid #cbd5e1; border-radius: 8px; background: #f8fafc; overflow: hidden; }
+.superkey-cell-input { width: 88px; height: 36px; padding: 0 8px; border: 0; color: #0f172a; background: transparent; font-size: 14px; font-weight: 700; text-align: center; outline: 0; }
+.superkey-cell-input:focus { background: #fff; color: #1d4ed8; }
+.superkey-cell-remove { width: 26px; height: 36px; border: 0; border-left: 1px solid #e2e8f0; color: #94a3b8; background: transparent; font-size: 15px; cursor: pointer; }
+.superkey-cell-remove:hover { color: #b91c1c; background: #fff1f2; }
+.superkey-add-cell { height: 36px; padding: 0 12px; border: 1.5px dashed #93c5fd; border-radius: 8px; color: #1d4ed8; background: #f8fbff; font-size: 12px; font-weight: 700; cursor: pointer; }
+.superkey-add-cell:hover { border-style: solid; background: #eff6ff; }
+
+.closure-final-conclusion { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 18px; border: 1.5px solid #a7f3d0; border-radius: 10px; background: #ecfdf5; color: #064e3b; font-size: 15px; }
+
+/* Presentation mode hides dashed borders so board looks like clean textbook/slides */
+.closure-page.is-presenting .closure-inline-input,
+.closure-page.is-presenting .closure-explanation-input { border-color: transparent; background: transparent; padding-left: 4px; padding-right: 4px; }
+.closure-page.is-presenting .closure-problem-box .closure-inline-input { background: rgba(255,255,255,.7); }
+
+@media (max-width: 760px) {
+  .closure-content { width: calc(100% - 24px); padding-top: 22px; }
+  .closure-sheet { padding: 20px 16px; font-size: 14px; }
+  .closure-input-fds, .closure-input-wide { width: 100%; min-width: 0; }
+}

@@ -189,6 +189,7 @@ export default function TaskDetail({ taskId }: { taskId: string }) {
         <nav className="dashboard-topnav">
           <Link className="topnav-tab" href="/">📁 Sơ đồ của tôi</Link>
           <Link className="topnav-tab active" href="/tasks">📝 Bài tập</Link>
+          <Link className="topnav-tab" href="/closure">🔑 Tìm siêu khóa</Link>
           <span className="topnav-breadcrumb">› Chi tiết</span>
         </nav>
       </div>

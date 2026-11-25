@@ -88,6 +88,7 @@ export default function DashboardPage() {
         <nav className="dashboard-topnav">
           <Link className="topnav-tab active" href="/">📁 Sơ đồ của tôi</Link>
           <Link className="topnav-tab" href="/tasks">📝 Bài tập</Link>
+          <Link className="topnav-tab" href="/closure">🔑 Tìm siêu khóa</Link>
         </nav>
       </div>
       <div className="dashboard-user">
