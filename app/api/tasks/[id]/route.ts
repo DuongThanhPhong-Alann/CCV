@@ -2,6 +2,7 @@ import { ObjectId } from "mongodb";
 import { deleteAppDocument, findAppDocument, listAppDocuments, patchAppDocument, writeAppDocument, type AppDocument } from "@/lib/app-data";
 import { currentOwnerId } from "@/lib/current-user";
 import { getDatabase } from "@/lib/mongodb";
+import { resolveAssignRecipients } from "@/lib/task-assign";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -143,33 +144,34 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     if (action === "assign") {
       if (!task.createdById.equals(ownerId)) return Response.json({ error: "Chỉ người tạo đề mới có thể giao bài." }, { status: 403 });
       if (task.status !== "draft") return Response.json({ error: "Chỉ có thể giao bài đang ở trạng thái nháp." }, { status: 409 });
-      const recipientId = typeof body.assignedToId === "string" && /^[0-9a-f]{24}$/i.test(body.assignedToId)
-        ? new ObjectId(body.assignedToId)
-        : null;
-      if (!recipientId) return Response.json({ error: "Hãy chọn một tài khoản nhận bài." }, { status: 400 });
-      if (recipientId.equals(ownerId)) return Response.json({ error: "Bạn không thể giao bài cho chính mình." }, { status: 400 });
-      const recipient = await findAppDocument<AppDocument & { name?: string; email?: string }>("users", recipientId.toString(), () => getDatabase().collection<{ _id: ObjectId; name?: string; email?: string }>("users")
-        .findOne({ _id: recipientId }, { projection: { _id: 1, name: 1, email: 1 } }));
-      if (!recipient?.email) return Response.json({ error: "Tài khoản nhận không còn tồn tại." }, { status: 404 });
+
+      const resolved = await resolveAssignRecipients(body, ownerId);
+      if (resolved.error || resolved.recipients.length === 0) {
+        return Response.json({ error: resolved.error || "Hãy chọn ít nhất một tài khoản nhận bài." }, { status: resolved.status ?? 400 });
+      }
 
       const now = new Date();
-      const assignmentId = new ObjectId();
-      await writeAppDocument("tasks", {
-        _id: assignmentId,
-        title: task.title,
-        description: task.description,
-        createdById: task.createdById,
-        createdByName: task.createdByName,
-        createdByEmail: task.createdByEmail,
-        assignedToId: recipient._id,
-        assignedToName: recipient.name || recipient.email,
-        assignedToEmail: recipient.email,
-        sourceTaskId: taskId,
-        status: "invited",
-        createdAt: now,
-        updatedAt: now,
-      });
-      return Response.json({ ok: true, id: assignmentId.toString() }, { status: 201 });
+      const createdIds: string[] = [];
+      for (const recipient of resolved.recipients) {
+        const assignmentId = new ObjectId();
+        await writeAppDocument("tasks", {
+          _id: assignmentId,
+          title: task.title,
+          description: task.description,
+          createdById: task.createdById,
+          createdByName: task.createdByName,
+          createdByEmail: task.createdByEmail,
+          assignedToId: recipient._id,
+          assignedToName: recipient.name,
+          assignedToEmail: recipient.email,
+          sourceTaskId: taskId,
+          status: "invited",
+          createdAt: now,
+          updatedAt: now,
+        });
+        createdIds.push(assignmentId.toString());
+      }
+      return Response.json({ ok: true, id: createdIds[0], ids: createdIds, assignedCount: createdIds.length }, { status: 201 });
     }
 
     if (action === "accept") {

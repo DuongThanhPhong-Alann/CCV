@@ -336,6 +336,7 @@ export default function ClosureBoard() {
           <nav className="dashboard-topnav">
             <Link className="topnav-tab" href="/">📁 Sơ đồ của tôi</Link>
             <Link className="topnav-tab" href="/tasks">📝 Bài tập</Link>
+            <Link className="topnav-tab" href="/code-tasks">💻 Code bài tập</Link>
             <Link className="topnav-tab active" href="/closure">🔑 Tìm siêu khóa</Link>
           </nav>
         </div>

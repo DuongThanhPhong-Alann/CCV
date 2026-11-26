@@ -5,11 +5,11 @@ import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
+import MultiRecipientPicker, { type RecipientAccount } from "@/components/multi-recipient-picker";
 import { readJsonResponse } from "@/lib/read-json-response";
 import type { AssignmentTask } from "@/lib/task-types";
 
 type ViewerRole = "creator" | "assignee";
-type RecipientAccount = { id: string; name: string; email: string };
 type Account = { id: string; name: string | null; email: string | null };
 
 function formatDate(value?: string | null) {
@@ -36,10 +36,6 @@ export default function TaskDetail({ taskId }: { taskId: string }) {
   const [assignmentNotice, setAssignmentNotice] = useState("");
   const [score, setScore] = useState("");
   const [feedback, setFeedback] = useState("");
-  const [recipientQuery, setRecipientQuery] = useState("");
-  const [recipients, setRecipients] = useState<RecipientAccount[]>([]);
-  const [selectedRecipient, setSelectedRecipient] = useState<RecipientAccount | null>(null);
-  const [searchingRecipients, setSearchingRecipients] = useState(false);
 
   const loadTask = async () => {
     setLoading(true);
@@ -68,44 +64,23 @@ export default function TaskDetail({ taskId }: { taskId: string }) {
 
   useEffect(() => { void loadTask(); }, [taskId]);
 
-  useEffect(() => {
-    const query = recipientQuery.trim();
-    if (viewerRole !== "creator" || task?.status !== "draft" || query.length < 2) {
-      setRecipients([]);
-      setSearchingRecipients(false);
-      return;
-    }
-    const controller = new AbortController();
-    const timeout = window.setTimeout(async () => {
-      setSearchingRecipients(true);
-      try {
-        const response = await fetch(`/api/tasks/recipients?query=${encodeURIComponent(query)}`, { cache: "no-store", signal: controller.signal });
-        const result = await readJsonResponse<{ accounts?: RecipientAccount[] }>(response);
-        if (response.ok) setRecipients(result.accounts ?? []);
-      } catch {
-        if (!controller.signal.aborted) setRecipients([]);
-      } finally {
-        if (!controller.signal.aborted) setSearchingRecipients(false);
-      }
-    }, 220);
-    return () => { window.clearTimeout(timeout); controller.abort(); };
-  }, [recipientQuery, task?.id, task?.status, viewerRole]);
-
-  const assignTask = async () => {
-    if (!selectedRecipient) return;
+  const assignTask = async (selectedRecipients: RecipientAccount[]) => {
+    if (!selectedRecipients.length) return;
     setBusy(true);
     setError("");
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "assign", assignedToId: selectedRecipient.id }),
+        body: JSON.stringify({
+          action: "assign",
+          assignedToIds: selectedRecipients.map((item) => item.id),
+        }),
       });
-      const result = await readJsonResponse<{ error?: string }>(response);
+      const result = await readJsonResponse<{ error?: string; assignedCount?: number }>(response);
       if (!response.ok) throw new Error(result.error || "Không thể giao bài tập.");
-      setSelectedRecipient(null);
-      setRecipientQuery("");
-      setAssignmentNotice(`Đã giao đề cho ${selectedRecipient.name}. Đề gốc vẫn nằm trong kho để bạn giao tiếp.`);
+      const names = selectedRecipients.map((item) => item.name).join(", ");
+      setAssignmentNotice(`Đã giao đề cho ${result.assignedCount ?? selectedRecipients.length} người (${names}). Đề gốc vẫn nằm trong kho.`);
       await loadTask();
     } catch (assignError) {
       setError(assignError instanceof Error ? assignError.message : "Không thể giao bài tập.");
@@ -189,6 +164,7 @@ export default function TaskDetail({ taskId }: { taskId: string }) {
         <nav className="dashboard-topnav">
           <Link className="topnav-tab" href="/">📁 Sơ đồ của tôi</Link>
           <Link className="topnav-tab active" href="/tasks">📝 Bài tập</Link>
+          <Link className="topnav-tab" href="/code-tasks">💻 Code bài tập</Link>
           <Link className="topnav-tab" href="/closure">🔑 Tìm siêu khóa</Link>
           <span className="topnav-breadcrumb">› Chi tiết</span>
         </nav>
@@ -247,44 +223,15 @@ export default function TaskDetail({ taskId }: { taskId: string }) {
         {isCreator && task.status === "draft" && (
           <section className="task-action-panel task-assign-panel">
             <div className="task-assign-copy">
-              <h2>Giao bài tập cho tài khoản</h2>
-              <p>Mỗi lần giao sẽ tạo một lượt làm bài riêng. Đề gốc vẫn ở trong kho để bạn giao cho nhiều người hoặc giao lại sau.</p>
+              <h2>Giao bài tập cho nhiều tài khoản</h2>
+              <p>Chọn một hoặc nhiều học viên để giao cùng lúc. Mỗi người sẽ nhận một lượt làm bài riêng, đề gốc vẫn ở trong kho.</p>
             </div>
-            <div className="recipient-picker">
-              {selectedRecipient ? (
-                <div className="recipient-selected">
-                  <span>
-                    <strong>{selectedRecipient.name}</strong>
-                    <small>{selectedRecipient.email}</small>
-                  </span>
-                  <button type="button" disabled={busy} onClick={() => { setSelectedRecipient(null); setRecipientQuery(""); }}>Đổi người khác</button>
-                </div>
-              ) : (
-                <>
-                  <label htmlFor="recipient-search">Tìm tài khoản học viên</label>
-                  <input id="recipient-search" type="search" autoComplete="off" value={recipientQuery} onChange={(event) => setRecipientQuery(event.target.value)} placeholder="Nhập tên hoặc email học viên để tìm…" />
-                  {recipientQuery.trim().length >= 2 && (
-                    <div className="recipient-results" role="listbox" aria-label="Tài khoản phù hợp">
-                      {searchingRecipients ? (
-                        <p>Đang tìm tài khoản…</p>
-                      ) : recipients.length ? (
-                        recipients.map((recipient) => (
-                          <button type="button" role="option" aria-selected={false} key={recipient.id} onClick={() => { setSelectedRecipient(recipient); setRecipientQuery(""); setRecipients([]); }}>
-                            <strong>{recipient.name}</strong>
-                            <small>{recipient.email}</small>
-                          </button>
-                        ))
-                      ) : (
-                        <p>Không tìm thấy tài khoản phù hợp.</p>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
-              <button className="create-diagram-button" type="button" disabled={busy || !selectedRecipient} onClick={() => void assignTask()}>
-                {busy ? "Đang xử lý…" : "Giao bài tập ngay"}
-              </button>
-            </div>
+            <MultiRecipientPicker
+              busy={busy}
+              alreadyAssignedEmails={(task.deliveries ?? []).map((d) => d.assignedToEmail ?? "").filter(Boolean)}
+              onAssign={assignTask}
+              inputId="erd-recipient-search"
+            />
           </section>
         )}
 

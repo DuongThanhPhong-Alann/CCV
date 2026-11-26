@@ -88,6 +88,7 @@ export default function DashboardPage() {
         <nav className="dashboard-topnav">
           <Link className="topnav-tab active" href="/">📁 Sơ đồ của tôi</Link>
           <Link className="topnav-tab" href="/tasks">📝 Bài tập</Link>
+          <Link className="topnav-tab" href="/code-tasks">💻 Code bài tập</Link>
           <Link className="topnav-tab" href="/closure">🔑 Tìm siêu khóa</Link>
         </nav>
       </div>
@@ -98,7 +99,21 @@ export default function DashboardPage() {
       </div>
     </header>
     <section className="dashboard-content">
-      <div className="dashboard-heading"><div><span className="dashboard-eyebrow">KHÔNG GIAN CỦA BẠN</span><h1>Sơ đồ cơ sở dữ liệu</h1><p>Tạo, chỉnh sửa và quản lý các sơ đồ ERD của bạn.</p></div><button className="create-diagram-button" type="button" onClick={() => { setNewName(""); setError(""); setShowCreate(true); }}><span>＋</span> Tạo sơ đồ mới</button></div>
+      <div className="dashboard-heading">
+        <div>
+          <span className="dashboard-eyebrow">KHÔNG GIAN CỦA BẠN</span>
+          <h1>Sơ đồ cơ sở dữ liệu</h1>
+          <p>Tạo, chỉnh sửa và quản lý các sơ đồ ERD của bạn.</p>
+        </div>
+        <div className="code-heading-actions">
+          <Link className="code-secondary-button action-btn-link" href="/code-tasks">
+            💻 Bài tập Code
+          </Link>
+          <button className="create-diagram-button" type="button" onClick={() => { setNewName(""); setError(""); setShowCreate(true); }}>
+            <span>＋</span> Tạo sơ đồ mới
+          </button>
+        </div>
+      </div>
       {error && <div className="dashboard-error" role="alert"><span>{error}</span><button type="button" onClick={() => setError("")}>Đóng</button></div>}
       {diagrams.length > 0 ? <div className="diagram-grid">{diagrams.map((diagram) => (
         <article className="diagram-card" key={diagram.id}>

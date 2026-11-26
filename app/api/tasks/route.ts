@@ -9,6 +9,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type AssignmentDoc = {
+  taskType?: string;
   title: string;
   description: string;
   createdById: ObjectId;
@@ -54,6 +55,7 @@ export async function GET() {
   try {
     const tasks = getDatabase().collection<AssignmentDoc>("tasks");
     const summaryProjection = {
+      taskType: 1,
       title: 1, description: 1,
       createdById: 1, createdByName: 1, createdByEmail: 1,
       assignedToId: 1, assignedToName: 1, assignedToEmail: 1, sourceTaskId: 1,
@@ -61,10 +63,12 @@ export async function GET() {
       "submission.version": 1, "submission.submittedAt": 1,
       grade: 1, createdAt: 1, updatedAt: 1,
     };
-    const [received, created] = await Promise.all([
+    const [receivedRaw, createdRaw] = await Promise.all([
       listAppDocuments<AssignmentDoc & AppDocument>("tasks", { assignedToId: ownerId.toString() }, () => tasks.find({ assignedToId: ownerId }, { projection: summaryProjection }).sort({ updatedAt: -1 }).toArray()),
       listAppDocuments<AssignmentDoc & AppDocument>("tasks", { ownerId: ownerId.toString() }, () => tasks.find({ createdById: ownerId }, { projection: summaryProjection }).sort({ updatedAt: -1 }).toArray()),
     ]);
+    const received = receivedRaw.filter((task) => task.taskType !== "code");
+    const created = createdRaw.filter((task) => task.taskType !== "code");
     const sent = created.filter((task) => task.status !== "draft");
     const drafts = created.filter((task) => task.status === "draft");
     const countsByTaskId = new Map<string, number>();

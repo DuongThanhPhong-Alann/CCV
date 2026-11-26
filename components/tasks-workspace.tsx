@@ -5,6 +5,7 @@ import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
+import BatchDraftAssignBar from "@/components/batch-draft-assign-bar";
 import { readJsonResponse } from "@/lib/read-json-response";
 import type { AssignmentTask } from "@/lib/task-types";
 
@@ -35,6 +36,8 @@ export default function TasksWorkspace() {
   const [drafts, setDrafts] = useState<AssignmentTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [selectedDraftIds, setSelectedDraftIds] = useState<string[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState("");
@@ -100,6 +103,7 @@ export default function TasksWorkspace() {
         <nav className="dashboard-topnav">
           <Link className="topnav-tab" href="/">📁 Sơ đồ của tôi</Link>
           <Link className="topnav-tab active" href="/tasks">📝 Bài tập</Link>
+          <Link className="topnav-tab" href="/code-tasks">💻 Code bài tập</Link>
           <Link className="topnav-tab" href="/closure">🔑 Tìm siêu khóa</Link>
         </nav>
       </div>
@@ -123,6 +127,7 @@ export default function TasksWorkspace() {
       </div>
 
       {error && <div className="dashboard-error" role="alert"><span>{error}</span><button type="button" onClick={() => setError("")}>Đóng</button></div>}
+      {notice && <div className="task-assignment-message" role="status"><span>{notice}</span><button type="button" onClick={() => setNotice("")}>Đóng</button></div>}
 
       <div className="task-tabs" role="tablist" aria-label="Danh sách bài tập">
         <button className={scope === "received" ? "active" : ""} type="button" role="tab" aria-selected={scope === "received"} onClick={() => setScope("received")}>
@@ -136,6 +141,20 @@ export default function TasksWorkspace() {
         </button>
       </div>
 
+      {scope === "drafts" && (
+        <BatchDraftAssignBar
+          drafts={drafts.map((d) => ({ id: d.id, title: d.title }))}
+          selectedIds={selectedDraftIds}
+          onChangeSelected={setSelectedDraftIds}
+          endpoint="/api/tasks/batch-assign"
+          onError={setError}
+          onAssigned={async (msg) => {
+            setNotice(msg);
+            await loadTasks();
+          }}
+        />
+      )}
+
       {items.length ? (
         <div className="task-list">
           {items.map((task) => {
@@ -146,9 +165,10 @@ export default function TasksWorkspace() {
                 ? "Kho đề bài · Có thể giao nhiều lần"
                 : `Người nhận: ${task.assignedToName || "Chưa có"} (${task.assignedToEmail || "—"})`;
             const icon = scope === "received" ? "📥" : scope === "drafts" ? "📝" : "📤";
+            const isSelected = scope === "drafts" && selectedDraftIds.includes(task.id);
 
-            return (
-              <Link className={`task-list-card task-card-${state.tone}`} href={`/tasks/${task.id}`} key={task.id}>
+            const card = (
+              <Link className={`task-list-card task-card-${state.tone} ${isSelected ? "is-selected-card" : ""}`} href={`/tasks/${task.id}`} key={task.id}>
                 <div className={`task-list-icon task-icon-${state.tone}`}>{icon}</div>
                 <div className="task-list-main">
                   <div className="task-list-title">
@@ -174,6 +194,25 @@ export default function TasksWorkspace() {
                 </div>
                 <span className="task-list-arrow">›</span>
               </Link>
+            );
+
+            if (scope !== "drafts") return card;
+
+            return (
+              <div className={`task-select-row ${isSelected ? "is-selected" : ""}`} key={task.id}>
+                <label className="task-select-check" title="Chọn đề này để giao">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() =>
+                      setSelectedDraftIds((prev) =>
+                        prev.includes(task.id) ? prev.filter((id) => id !== task.id) : [...prev, task.id],
+                      )
+                    }
+                  />
+                </label>
+                {card}
+              </div>
             );
           })}
         </div>
