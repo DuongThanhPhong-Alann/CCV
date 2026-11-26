@@ -95,6 +95,7 @@ export type CodeTaskDelivery = {
   assignedToName: string | null;
   assignedToEmail: string | null;
   status: TaskStatus;
+  dueAt?: string | null;
   lastRun: {
     percentage: number;
     earnedPoints?: number;
@@ -144,6 +145,7 @@ export type CodeTask = {
   assignedCount?: number;
   deliveries?: CodeTaskDelivery[];
   status: TaskStatus;
+  dueAt?: string | null;
   acceptedAt?: string | null;
   savedCode?: CodeBundle | null;
   lastRun: CodeRunSnapshot | null;

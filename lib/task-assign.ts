@@ -83,3 +83,21 @@ export async function resolveAssignRecipients(
 
   return { recipients };
 }
+
+/**
+ * Parses an optional assignment deadline (`dueAt`) from client input.
+ * Naive `YYYY-MM-DDTHH:mm` values are interpreted in Vietnam time (+07:00).
+ */
+export function parseDueAtInput(raw: unknown): { dueAt: Date | null; error?: string } {
+  if (raw === null || raw === undefined) return { dueAt: null };
+  if (typeof raw !== "string") return { dueAt: null, error: "Hạn nộp bài không hợp lệ." };
+  const trimmed = raw.trim();
+  if (!trimmed) return { dueAt: null };
+  const normalized =
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(trimmed) ? `${trimmed}+07:00` : trimmed;
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) {
+    return { dueAt: null, error: "Định dạng ngày giờ hạn nộp chưa đúng." };
+  }
+  return { dueAt: parsed };
+}

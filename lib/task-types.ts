@@ -25,6 +25,7 @@ export type TaskDelivery = {
   assignedToName: string | null;
   assignedToEmail: string | null;
   status: TaskStatus;
+  dueAt?: string | null;
   submission: { version: number; submittedAt?: string } | null;
   grade: { score: number; submissionVersion: number } | null;
   updatedAt: string;
@@ -44,6 +45,7 @@ export type AssignmentTask = {
   assignedCount?: number;
   deliveries?: TaskDelivery[];
   status: TaskStatus;
+  dueAt?: string | null;
   diagramId: string | null;
   acceptedAt?: string | null;
   submission: TaskSubmission | null;

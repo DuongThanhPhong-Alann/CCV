@@ -5,6 +5,7 @@ import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
+import { DueDateAssignField, DueDateEditorCard, localDateTimeInputToIso } from "@/components/due-date-control";
 import MultiRecipientPicker, { type RecipientAccount } from "@/components/multi-recipient-picker";
 import { readJsonResponse } from "@/lib/read-json-response";
 import type { AssignmentTask } from "@/lib/task-types";
@@ -36,6 +37,7 @@ export default function TaskDetail({ taskId }: { taskId: string }) {
   const [assignmentNotice, setAssignmentNotice] = useState("");
   const [score, setScore] = useState("");
   const [feedback, setFeedback] = useState("");
+  const [assignDueAtLocal, setAssignDueAtLocal] = useState("");
 
   const loadTask = async () => {
     setLoading(true);
@@ -75,15 +77,47 @@ export default function TaskDetail({ taskId }: { taskId: string }) {
         body: JSON.stringify({
           action: "assign",
           assignedToIds: selectedRecipients.map((item) => item.id),
+          dueAt: localDateTimeInputToIso(assignDueAtLocal),
         }),
       });
-      const result = await readJsonResponse<{ error?: string; assignedCount?: number }>(response);
+      const result = await readJsonResponse<{ error?: string; assignedCount?: number; emailSentCount?: number; mailConfigured?: boolean }>(response);
       if (!response.ok) throw new Error(result.error || "Không thể giao bài tập.");
       const names = selectedRecipients.map((item) => item.name).join(", ");
-      setAssignmentNotice(`Đã giao đề cho ${result.assignedCount ?? selectedRecipients.length} người (${names}). Đề gốc vẫn nằm trong kho.`);
+      const mailNote =
+        result.mailConfigured === false
+          ? ""
+          : typeof result.emailSentCount === "number"
+            ? ` Đã gửi mail cho ${result.emailSentCount}/${result.assignedCount ?? selectedRecipients.length} học viên.`
+            : "";
+      setAssignmentNotice(`Đã giao đề cho ${result.assignedCount ?? selectedRecipients.length} người (${names}). Đề gốc vẫn nằm trong kho.${mailNote}`);
       await loadTask();
     } catch (assignError) {
       setError(assignError instanceof Error ? assignError.message : "Không thể giao bài tập.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const updateDueDate = async (isoDueAt: string | null) => {
+    setBusy(true);
+    setError("");
+    setAssignmentNotice("");
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "updateDueDate", dueAt: isoDueAt }),
+      });
+      const result = await readJsonResponse<{ error?: string; updatedCount?: number; emailSentCount?: number; emailSent?: boolean }>(response);
+      if (!response.ok) throw new Error(result.error || "Không thể cập nhật hạn nộp bài.");
+      const sentInfo =
+        result.emailSent || (result.emailSentCount ?? 0) > 0
+          ? " Đã gửi email thông báo hạn mới tới học viên."
+          : "";
+      setAssignmentNotice(`Đã cập nhật hạn nộp bài cho ${result.updatedCount ?? 1} lượt làm bài.${sentInfo}`);
+      await loadTask();
+    } catch (dueError) {
+      setError(dueError instanceof Error ? dueError.message : "Không thể cập nhật hạn nộp bài.");
     } finally {
       setBusy(false);
     }
@@ -194,7 +228,10 @@ export default function TaskDetail({ taskId }: { taskId: string }) {
             <span className="dashboard-eyebrow">CHI TIẾT BÀI TẬP</span>
             <h1>{task.title}</h1>
           </div>
-          <span className="task-detail-date">🕒 Ngày tạo: {formatDate(task.createdAt)}</span>
+          <div className="task-detail-dates-col">
+            <span className="task-detail-date">🕒 Ngày tạo: {formatDate(task.createdAt)}</span>
+            {task.dueAt && <span className="due-pill">⏰ Hạn nộp: {formatDate(task.dueAt)}</span>}
+          </div>
         </div>
 
         {/* Task description box */}
@@ -225,6 +262,12 @@ export default function TaskDetail({ taskId }: { taskId: string }) {
             <div className="task-assign-copy">
               <h2>Giao bài tập cho nhiều tài khoản</h2>
               <p>Chọn một hoặc nhiều học viên để giao cùng lúc. Mỗi người sẽ nhận một lượt làm bài riêng, đề gốc vẫn ở trong kho.</p>
+              <DueDateAssignField
+                value={assignDueAtLocal}
+                onChange={setAssignDueAtLocal}
+                disabled={busy}
+                inputId="erd-assign-due-at"
+              />
             </div>
             <MultiRecipientPicker
               busy={busy}
@@ -235,12 +278,27 @@ export default function TaskDetail({ taskId }: { taskId: string }) {
           </section>
         )}
 
+        {isCreator && task.status !== "draft" && (
+          <DueDateEditorCard
+            currentDueAt={task.dueAt}
+            busy={busy}
+            label="Hạn nộp lượt bài này"
+            onSave={updateDueDate}
+          />
+        )}
+
         {isCreator && task.status === "draft" && task.deliveries?.length ? (
           <section className="task-deliveries">
             <header>
               <div><span className="dashboard-eyebrow">CÁC LƯỢT ĐÃ GIAO</span><h2>{task.deliveries.length} lượt làm bài</h2></div>
               <Link href="/tasks">Xem danh sách đã giao →</Link>
             </header>
+            <DueDateEditorCard
+              currentDueAt={task.deliveries[0]?.dueAt ?? null}
+              busy={busy}
+              label={`Hạn nộp chung cho ${task.deliveries.length} lượt đã giao`}
+              onSave={updateDueDate}
+            />
             <div className="task-delivery-list">
               {task.deliveries.map((delivery) => {
                 const deliveryState = statusLabel(delivery);

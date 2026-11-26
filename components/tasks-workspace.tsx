@@ -6,6 +6,7 @@ import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import BatchDraftAssignBar from "@/components/batch-draft-assign-bar";
+import MailActionsBar from "@/components/mail-actions-bar";
 import { readJsonResponse } from "@/lib/read-json-response";
 import type { AssignmentTask } from "@/lib/task-types";
 
@@ -155,6 +156,10 @@ export default function TasksWorkspace() {
         />
       )}
 
+      {scope === "sent" && sent.length > 0 && (
+        <MailActionsBar onSuccess={setNotice} onError={setError} />
+      )}
+
       {items.length ? (
         <div className="task-list">
           {items.map((task) => {
@@ -181,6 +186,9 @@ export default function TasksWorkspace() {
                   <p className="task-person-meta">{personLabel}</p>
                   <div className="task-card-meta-row">
                     <span className="task-list-date">🕒 Cập nhật: {formatDate(task.updatedAt)}</span>
+                    {task.dueAt && (
+                      <span className="due-pill">⏰ Hạn: {formatDate(task.dueAt)}</span>
+                    )}
                     {task.submission && (
                       <span className="task-sub-count">📄 Bản nộp v{task.submission.version}</span>
                     )}

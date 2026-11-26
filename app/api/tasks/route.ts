@@ -20,6 +20,7 @@ type AssignmentDoc = {
   assignedToEmail?: string;
   sourceTaskId?: ObjectId;
   status: "draft" | "invited" | "accepted" | "declined";
+  dueAt?: Date | string | null;
   diagramId?: ObjectId;
   submission?: { version: number; submittedAt: Date };
   grade?: { score: number; feedback: string; gradedAt: Date; submissionVersion: number } | null;
@@ -40,6 +41,7 @@ function serializeTask(task: AssignmentDoc & { _id: ObjectId }) {
     assignedToEmail: task.assignedToEmail ?? null,
     sourceTaskId: task.sourceTaskId?.toString() ?? null,
     status: task.status,
+    dueAt: task.dueAt instanceof Date ? task.dueAt.toISOString() : typeof task.dueAt === "string" ? task.dueAt : null,
     diagramId: task.diagramId?.toString() ?? null,
     submission: task.submission ?? null,
     grade: task.grade ?? null,
@@ -59,7 +61,7 @@ export async function GET() {
       title: 1, description: 1,
       createdById: 1, createdByName: 1, createdByEmail: 1,
       assignedToId: 1, assignedToName: 1, assignedToEmail: 1, sourceTaskId: 1,
-      status: 1, diagramId: 1,
+      status: 1, dueAt: 1, diagramId: 1,
       "submission.version": 1, "submission.submittedAt": 1,
       grade: 1, createdAt: 1, updatedAt: 1,
     };

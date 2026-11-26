@@ -1,8 +1,9 @@
 import { ObjectId } from "mongodb";
 import { deleteAppDocument, findAppDocument, listAppDocuments, patchAppDocument, writeAppDocument, type AppDocument } from "@/lib/app-data";
 import { currentOwnerId } from "@/lib/current-user";
+import { isMailConfigured, sendDueDateUpdatedEmail, sendTaskGradedEmail, sendTasksAssignedEmail } from "@/lib/mailer";
 import { getDatabase } from "@/lib/mongodb";
-import { resolveAssignRecipients } from "@/lib/task-assign";
+import { parseDueAtInput, resolveAssignRecipients } from "@/lib/task-assign";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,6 +28,7 @@ type AssignmentDoc = {
   assignedToEmail?: string;
   sourceTaskId?: ObjectId;
   status: "draft" | "invited" | "accepted" | "declined";
+  dueAt?: Date | string | null;
   diagramId?: ObjectId;
   acceptedAt?: Date;
   submission?: Snapshot;
@@ -48,6 +50,7 @@ function serializeTask(task: AssignmentDoc & { _id: ObjectId }) {
     assignedToEmail: task.assignedToEmail ?? null,
     sourceTaskId: task.sourceTaskId?.toString() ?? null,
     status: task.status,
+    dueAt: task.dueAt instanceof Date ? task.dueAt.toISOString() : typeof task.dueAt === "string" ? task.dueAt : null,
     diagramId: task.diagramId?.toString() ?? null,
     acceptedAt: task.acceptedAt ?? null,
     submission: task.submission ?? null,
@@ -78,7 +81,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
           .find({ sourceTaskId: task._id, createdById: ownerId }, { projection: {
             title: 1, description: 1, createdById: 1, createdByName: 1, createdByEmail: 1,
             assignedToId: 1, assignedToName: 1, assignedToEmail: 1, sourceTaskId: 1,
-            status: 1, diagramId: 1, "submission.version": 1, "submission.submittedAt": 1,
+            status: 1, dueAt: 1, diagramId: 1, "submission.version": 1, "submission.submittedAt": 1,
             "grade.score": 1, "grade.submissionVersion": 1, createdAt: 1, updatedAt: 1,
           } }).sort({ updatedAt: -1 }).toArray())
       : [];
@@ -91,6 +94,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
           assignedToName: delivery.assignedToName ?? null,
           assignedToEmail: delivery.assignedToEmail ?? null,
           status: delivery.status,
+          dueAt: delivery.dueAt instanceof Date ? delivery.dueAt.toISOString() : typeof delivery.dueAt === "string" ? delivery.dueAt : null,
           submission: delivery.submission ? { version: delivery.submission.version, submittedAt: delivery.submission.submittedAt } : null,
           grade: delivery.grade ? { score: delivery.grade.score, submissionVersion: delivery.grade.submissionVersion } : null,
           updatedAt: delivery.updatedAt,
@@ -149,9 +153,14 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       if (resolved.error || resolved.recipients.length === 0) {
         return Response.json({ error: resolved.error || "Hãy chọn ít nhất một tài khoản nhận bài." }, { status: resolved.status ?? 400 });
       }
+      const parsedDue = parseDueAtInput(body.dueAt);
+      if (parsedDue.error) {
+        return Response.json({ error: parsedDue.error }, { status: 400 });
+      }
 
       const now = new Date();
       const createdIds: string[] = [];
+      const mailPromises: Promise<{ sent: boolean }>[] = [];
       for (const recipient of resolved.recipients) {
         const assignmentId = new ObjectId();
         await writeAppDocument("tasks", {
@@ -166,12 +175,107 @@ export async function PATCH(request: Request, { params }: RouteContext) {
           assignedToEmail: recipient.email,
           sourceTaskId: taskId,
           status: "invited",
+          ...(parsedDue.dueAt ? { dueAt: parsedDue.dueAt } : {}),
           createdAt: now,
           updatedAt: now,
         });
-        createdIds.push(assignmentId.toString());
+        const createdId = assignmentId.toString();
+        createdIds.push(createdId);
+        mailPromises.push(
+          sendTasksAssignedEmail({
+            toEmail: recipient.email,
+            toName: recipient.name,
+            assignerName: task.createdByName,
+            assignerEmail: task.createdByEmail,
+            taskKind: "erd",
+            tasks: [{ id: createdId, title: task.title, dueAt: parsedDue.dueAt }],
+          }),
+        );
       }
-      return Response.json({ ok: true, id: createdIds[0], ids: createdIds, assignedCount: createdIds.length }, { status: 201 });
+      const mailResults = await Promise.all(mailPromises);
+      const emailSentCount = mailResults.filter((r) => r.sent).length;
+      return Response.json(
+        {
+          ok: true,
+          id: createdIds[0],
+          ids: createdIds,
+          assignedCount: createdIds.length,
+          dueAt: parsedDue.dueAt ? parsedDue.dueAt.toISOString() : null,
+          emailSentCount,
+          mailConfigured: isMailConfigured(),
+        },
+        { status: 201 },
+      );
+    }
+
+    if (action === "updateDueDate") {
+      if (!task.createdById.equals(ownerId)) return Response.json({ error: "Chỉ người giao đề mới có thể chỉnh hạn nộp bài." }, { status: 403 });
+      const parsedDue = parseDueAtInput(body.dueAt);
+      if (parsedDue.error) return Response.json({ error: parsedDue.error }, { status: 400 });
+      const now = new Date();
+      const dueValue = parsedDue.dueAt ? parsedDue.dueAt.toISOString() : null;
+      const notifyEmail = body.notifyEmail !== false;
+
+      if (task.status === "draft") {
+        const deliveries = await listAppDocuments<AssignmentDoc & AppDocument>(
+          "tasks",
+          { sourceId: taskId.toString(), ownerId: ownerId.toString() },
+          () => getDatabase().collection<AssignmentDoc>("tasks").find({ sourceTaskId: taskId, createdById: ownerId }).toArray(),
+        );
+        const updates = deliveries.filter((d) => d.taskType !== "code" && d.status !== "draft");
+        await Promise.all(
+          updates.map((d) =>
+            patchAppDocument(
+              "tasks",
+              d._id.toString(),
+              { dueAt: parsedDue.dueAt, deadlineReminderForDueAt: null, updatedAt: now },
+              { createdById: ownerId.toString() },
+            ),
+          ),
+        );
+        let emailSentCount = 0;
+        if (notifyEmail) {
+          const mailRes = await Promise.all(
+            updates
+              .filter((d) => Boolean(d.assignedToEmail))
+              .map((d) =>
+                sendDueDateUpdatedEmail({
+                  toEmail: d.assignedToEmail!,
+                  toName: d.assignedToName || "Học viên",
+                  updaterName: task.createdByName,
+                  taskKind: "erd",
+                  taskId: d._id.toString(),
+                  title: d.title,
+                  dueAt: parsedDue.dueAt,
+                }),
+              ),
+          );
+          emailSentCount = mailRes.filter((r) => r.sent).length;
+        }
+        return Response.json({ ok: true, dueAt: dueValue, updatedCount: updates.length, emailSentCount, mailConfigured: isMailConfigured() });
+      }
+
+      const updated = await patchAppDocument(
+        "tasks",
+        taskId.toString(),
+        { dueAt: parsedDue.dueAt, deadlineReminderForDueAt: null, updatedAt: now },
+        { createdById: ownerId.toString() },
+      );
+      if (!updated.updated) return Response.json({ error: "Không thể cập nhật hạn nộp bài." }, { status: 409 });
+      let emailSent = false;
+      if (notifyEmail && task.assignedToEmail) {
+        const res = await sendDueDateUpdatedEmail({
+          toEmail: task.assignedToEmail,
+          toName: task.assignedToName || "Học viên",
+          updaterName: task.createdByName,
+          taskKind: "erd",
+          taskId: taskId.toString(),
+          title: task.title,
+          dueAt: parsedDue.dueAt,
+        });
+        emailSent = res.sent;
+      }
+      return Response.json({ ok: true, dueAt: dueValue, updatedCount: 1, emailSent, mailConfigured: isMailConfigured() });
     }
 
     if (action === "accept") {
@@ -253,7 +357,21 @@ export async function PATCH(request: Request, { params }: RouteContext) {
         submissionVersion: task.submission.version,
       });
       if (!updated.updated) return Response.json({ error: "Bài nộp vừa thay đổi. Hãy tải lại trước khi chấm." }, { status: 409 });
-      return Response.json({ ok: true, grade });
+      let emailSent = false;
+      if (task.assignedToEmail) {
+        const mailRes = await sendTaskGradedEmail({
+          toEmail: task.assignedToEmail,
+          toName: task.assignedToName || "Học viên",
+          graderName: task.createdByName,
+          taskKind: "erd",
+          taskId: taskId.toString(),
+          title: task.title,
+          score,
+          feedback,
+        });
+        emailSent = mailRes.sent;
+      }
+      return Response.json({ ok: true, grade, emailSent, mailConfigured: isMailConfigured() });
     }
 
     return Response.json({ error: "Thao tác không hợp lệ." }, { status: 400 });

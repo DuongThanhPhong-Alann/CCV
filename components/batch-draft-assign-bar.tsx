@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DueDateAssignField, localDateTimeInputToIso } from "@/components/due-date-control";
 import MultiRecipientPicker, { type RecipientAccount } from "@/components/multi-recipient-picker";
 import { readJsonResponse } from "@/lib/read-json-response";
 
@@ -27,6 +28,7 @@ export default function BatchDraftAssignBar({
   onError,
 }: BatchDraftAssignBarProps) {
   const [busy, setBusy] = useState(false);
+  const [dueAtLocal, setDueAtLocal] = useState("");
 
   if (drafts.length === 0) return null;
 
@@ -44,6 +46,7 @@ export default function BatchDraftAssignBar({
         body: JSON.stringify({
           taskIds: selectedIds,
           assignedToIds: recipients.map((r) => r.id),
+          dueAt: localDateTimeInputToIso(dueAtLocal),
         }),
       });
       const result = await readJsonResponse<{
@@ -51,12 +54,20 @@ export default function BatchDraftAssignBar({
         assignedTasks?: number;
         recipientCount?: number;
         totalCreated?: number;
+        emailSentCount?: number;
+        mailConfigured?: boolean;
       }>(response);
       if (!response.ok) throw new Error(result.error || "Không thể giao hàng loạt bài tập.");
       const names = recipients.map((r) => r.name).join(", ");
+      const mailNote =
+        result.mailConfigured === false
+          ? " (Chưa cấu hình SMTP_USER/SMTP_PASS trong .env.local nên chưa gửi email)."
+          : typeof result.emailSentCount === "number"
+            ? ` Đã gửi email thông báo tới ${result.emailSentCount}/${result.recipientCount ?? recipients.length} người.`
+            : "";
       onChangeSelected([]);
       await onAssigned(
-        `Đã giao ${result.assignedTasks ?? selectedIds.length} đề bài cho ${result.recipientCount ?? recipients.length} người (${names}) — tổng ${result.totalCreated ?? selectedIds.length * recipients.length} lượt làm bài.`,
+        `Đã giao ${result.assignedTasks ?? selectedIds.length} đề bài cho ${result.recipientCount ?? recipients.length} người (${names}) — tổng ${result.totalCreated ?? selectedIds.length * recipients.length} lượt làm bài.${mailNote}`,
       );
     } catch (err) {
       onError(err instanceof Error ? err.message : "Không thể giao hàng loạt bài tập.");
@@ -114,6 +125,12 @@ export default function BatchDraftAssignBar({
                 </span>
               ))}
             </div>
+            <DueDateAssignField
+              value={dueAtLocal}
+              onChange={setDueAtLocal}
+              disabled={busy}
+              inputId="batch-due-at"
+            />
           </div>
           <MultiRecipientPicker
             busy={busy}

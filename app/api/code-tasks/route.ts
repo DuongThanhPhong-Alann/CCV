@@ -34,6 +34,7 @@ type CodeTaskDoc = {
   assignedToEmail?: string;
   sourceTaskId?: ObjectId;
   status: "draft" | "invited" | "accepted" | "declined";
+  dueAt?: Date | string | null;
   acceptedAt?: Date;
   lastRun?: CodeRunSnapshot | null;
   submission?: CodeSubmission | null;
@@ -75,6 +76,7 @@ function serializeCodeTaskSummary(task: CodeTaskDoc & { _id: ObjectId }, include
     assignedToEmail: task.assignedToEmail ?? null,
     sourceTaskId: task.sourceTaskId?.toString() ?? null,
     status: task.status,
+    dueAt: task.dueAt instanceof Date ? task.dueAt.toISOString() : typeof task.dueAt === "string" ? task.dueAt : null,
     lastRun: task.lastRun
       ? {
           runCount: task.lastRun.runCount,

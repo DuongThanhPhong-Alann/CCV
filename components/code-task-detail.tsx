@@ -6,6 +6,7 @@ import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import CodeEditorPane from "@/components/code-editor-pane";
+import { DueDateAssignField, DueDateEditorCard, localDateTimeInputToIso } from "@/components/due-date-control";
 import CodePreviewFrame, {
   analyzeCodeInSandbox,
   evaluateCodeInSandbox,
@@ -116,6 +117,7 @@ export default function CodeTaskDetail({ taskId }: { taskId: string }) {
   const [draftExecutedCode, setDraftExecutedCode] = useState<CodeBundle>({ ...EMPTY_CODE_BUNDLE });
   const [draftGradeResult, setDraftGradeResult] = useState<CodeAutoGradeResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [assignDueAtLocal, setAssignDueAtLocal] = useState("");
 
   // Assignee IDE state
   const [studentCode, setStudentCode] = useState<CodeBundle>({ ...EMPTY_CODE_BUNDLE });
@@ -348,15 +350,47 @@ export default function CodeTaskDetail({ taskId }: { taskId: string }) {
         body: JSON.stringify({
           action: "assign",
           assignedToIds: selectedRecipients.map((item) => item.id),
+          dueAt: localDateTimeInputToIso(assignDueAtLocal),
         }),
       });
-      const result = await readJsonResponse<{ error?: string; assignedCount?: number }>(response);
+      const result = await readJsonResponse<{ error?: string; assignedCount?: number; emailSentCount?: number; mailConfigured?: boolean }>(response);
       if (!response.ok) throw new Error(result.error || "Không thể giao bài tập.");
       const names = selectedRecipients.map((item) => item.name).join(", ");
-      setNotice(`Đã giao bài tập code cho ${result.assignedCount ?? selectedRecipients.length} người (${names}). Kết quả làm bài sẽ tự động cập nhật ở bảng bên dưới.`);
+      const mailNote =
+        result.mailConfigured === false
+          ? ""
+          : typeof result.emailSentCount === "number"
+            ? ` Đã gửi mail cho ${result.emailSentCount}/${result.assignedCount ?? selectedRecipients.length} học viên.`
+            : "";
+      setNotice(`Đã giao bài tập code cho ${result.assignedCount ?? selectedRecipients.length} người (${names}). Kết quả làm bài sẽ tự động cập nhật ở bảng bên dưới.${mailNote}`);
       await loadTask();
     } catch (assignError) {
       setError(assignError instanceof Error ? assignError.message : "Không thể giao bài tập.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const updateDueDate = async (isoDueAt: string | null) => {
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch(`/api/code-tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "updateDueDate", dueAt: isoDueAt }),
+      });
+      const result = await readJsonResponse<{ error?: string; updatedCount?: number; emailSentCount?: number; emailSent?: boolean }>(response);
+      if (!response.ok) throw new Error(result.error || "Không thể cập nhật hạn nộp bài.");
+      const sentInfo =
+        result.emailSent || (result.emailSentCount ?? 0) > 0
+          ? " Đã gửi email thông báo hạn mới tới học viên."
+          : "";
+      setNotice(`Đã cập nhật hạn nộp bài cho ${result.updatedCount ?? 1} lượt làm bài.${sentInfo}`);
+      await loadTask();
+    } catch (dueError) {
+      setError(dueError instanceof Error ? dueError.message : "Không thể cập nhật hạn nộp bài.");
     } finally {
       setBusy(false);
     }
@@ -617,7 +651,10 @@ export default function CodeTaskDetail({ taskId }: { taskId: string }) {
               <span className="dashboard-eyebrow">BÀI TẬP CODE WEB · CHẤM HÀNH VI & ĐẦU RA TỰ ĐỘNG</span>
               <h1>{task.title}</h1>
             </div>
-            <span className="task-detail-date">🕒 Ngày tạo: {formatDate(task.createdAt)}</span>
+            <div className="task-detail-dates-col">
+              <span className="task-detail-date">🕒 Ngày tạo: {formatDate(task.createdAt)}</span>
+              {task.dueAt && <span className="due-pill">⏰ Hạn nộp: {formatDate(task.dueAt)}</span>}
+            </div>
           </div>
 
           <div className="task-description-box">
@@ -934,6 +971,12 @@ export default function CodeTaskDetail({ taskId }: { taskId: string }) {
                 <div className="task-assign-copy">
                   <h2>Giao bài tập code cho nhiều học viên</h2>
                   <p>Chọn một hoặc nhiều học viên để giao cùng lúc. Hãy nhớ bấm “Lưu thay đổi đề” trước nếu bạn vừa sửa tiêu chí hoặc code.</p>
+                  <DueDateAssignField
+                    value={assignDueAtLocal}
+                    onChange={setAssignDueAtLocal}
+                    disabled={busy}
+                    inputId="code-assign-due-at"
+                  />
                 </div>
                 <MultiRecipientPicker
                   busy={busy}
@@ -956,6 +999,12 @@ export default function CodeTaskDetail({ taskId }: { taskId: string }) {
                     </div>
                     <Link href="/code-tasks">Xem tất cả bài đã giao →</Link>
                   </header>
+                  <DueDateEditorCard
+                    currentDueAt={deliveries[0]?.dueAt ?? null}
+                    busy={busy}
+                    label={`Hạn nộp chung cho ${deliveries.length} lượt đã giao`}
+                    onSave={updateDueDate}
+                  />
                   <div className="task-delivery-list">
                     {deliveries.map((delivery) => {
                       const dGrade = delivery.submission ?? delivery.lastRun;
@@ -995,6 +1044,15 @@ export default function CodeTaskDetail({ taskId }: { taskId: string }) {
                 </section>
               )}
             </>
+          )}
+
+          {isCreator && task.status !== "draft" && (
+            <DueDateEditorCard
+              currentDueAt={task.dueAt}
+              busy={busy}
+              label="Hạn nộp lượt bài này"
+              onSave={updateDueDate}
+            />
           )}
 
           {/* ─── CREATOR VIEWING ASSIGNED TASK: REUSE / LINK ──────── */}

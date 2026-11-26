@@ -3,8 +3,9 @@ import { findAppDocument, writeAppDocument, type AppDocument } from "@/lib/app-d
 import { sanitizeCodeBundle } from "@/lib/code-grader";
 import type { CodeBundle, CodeCriterion } from "@/lib/code-task-types";
 import { currentOwnerId } from "@/lib/current-user";
+import { isMailConfigured, sendTasksAssignedEmail } from "@/lib/mailer";
 import { getDatabase } from "@/lib/mongodb";
-import { resolveAssignRecipients } from "@/lib/task-assign";
+import { parseDueAtInput, resolveAssignRecipients } from "@/lib/task-assign";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,6 +54,10 @@ export async function POST(request: Request) {
         { status: resolved.status ?? 400 },
       );
     }
+    const parsedDue = parseDueAtInput(body.dueAt);
+    if (parsedDue.error) {
+      return Response.json({ error: parsedDue.error }, { status: 400 });
+    }
 
     const tasksCol = getDatabase().collection<CodeTaskDoc>("tasks");
     const loadedTasks = await Promise.all(
@@ -79,10 +84,21 @@ export async function POST(request: Request) {
 
     const now = new Date();
     const writes: Promise<unknown>[] = [];
+    const recipientBatches = new Map<
+      string,
+      {
+        toEmail: string;
+        toName: string;
+        assignerName: string;
+        assignerEmail: string;
+        tasks: Array<{ id: string; title: string; category?: string; difficulty?: string; dueAt?: Date | null }>;
+      }
+    >();
 
     for (const draft of validDrafts) {
       for (const recipient of resolved.recipients) {
         const assignmentId = new ObjectId();
+        const assignmentIdStr = assignmentId.toString();
         writes.push(
           writeAppDocument("tasks", {
             _id: assignmentId,
@@ -103,20 +119,53 @@ export async function POST(request: Request) {
             assignedToEmail: recipient.email,
             sourceTaskId: draft._id,
             status: "invited",
+            ...(parsedDue.dueAt ? { dueAt: parsedDue.dueAt } : {}),
             createdAt: now,
             updatedAt: now,
           }),
         );
+        const recKey = recipient._id.toString();
+        const entry = recipientBatches.get(recKey) ?? {
+          toEmail: recipient.email,
+          toName: recipient.name,
+          assignerName: draft.createdByName,
+          assignerEmail: draft.createdByEmail,
+          tasks: [],
+        };
+        entry.tasks.push({
+          id: assignmentIdStr,
+          title: draft.title,
+          category: draft.category,
+          difficulty: draft.difficulty,
+          dueAt: parsedDue.dueAt,
+        });
+        recipientBatches.set(recKey, entry);
       }
     }
 
     await Promise.all(writes);
+    const mailResults = await Promise.all(
+      Array.from(recipientBatches.values()).map((batch) =>
+        sendTasksAssignedEmail({
+          toEmail: batch.toEmail,
+          toName: batch.toName,
+          assignerName: batch.assignerName,
+          assignerEmail: batch.assignerEmail,
+          taskKind: "code",
+          tasks: batch.tasks,
+        }),
+      ),
+    );
+    const emailSentCount = mailResults.filter((r) => r.sent).length;
+
     return Response.json(
       {
         ok: true,
         assignedTasks: validDrafts.length,
         recipientCount: resolved.recipients.length,
         totalCreated: writes.length,
+        emailSentCount,
+        mailConfigured: isMailConfigured(),
       },
       { status: 201 },
     );

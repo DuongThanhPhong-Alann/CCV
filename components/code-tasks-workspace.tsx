@@ -6,6 +6,7 @@ import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import BatchDraftAssignBar from "@/components/batch-draft-assign-bar";
+import MailActionsBar from "@/components/mail-actions-bar";
 import type { CodeTask } from "@/lib/code-task-types";
 import { readJsonResponse } from "@/lib/read-json-response";
 
@@ -360,6 +361,10 @@ export default function CodeTasksWorkspace() {
           />
         )}
 
+        {scope === "sent" && sent.length > 0 && (
+          <MailActionsBar onSuccess={setNotice} onError={setError} />
+        )}
+
         {visibleGroups.length ? (
           <div className="cluster-groups-stack">
             {visibleGroups.map((group) => {
@@ -422,6 +427,9 @@ export default function CodeTasksWorkspace() {
                               <span className="task-list-date">
                                 🕒 {task.lastRun?.ranAt ? `Run gần nhất: ${formatDate(task.lastRun.ranAt)}` : `Cập nhật: ${formatDate(task.updatedAt)}`}
                               </span>
+                              {task.dueAt && (
+                                <span className="due-pill">⏰ Hạn: {formatDate(task.dueAt)}</span>
+                              )}
                               {scope === "drafts" && (
                                 <>
                                   <span className="task-sub-count">↗ {task.assignedCount ?? 0} lượt giao</span>
