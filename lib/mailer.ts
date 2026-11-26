@@ -10,6 +10,23 @@ let cachedTransporter: nodemailer.Transporter | null = null;
 let cachedKey = "";
 
 export const APP_TIMEZONE = "Asia/Ho_Chi_Minh";
+export const PRODUCTION_APP_URL = "https://erd-navy.vercel.app";
+
+function resolveAppBaseUrl() {
+  const candidates = [
+    process.env.MAIL_BASE_URL,
+    process.env.APP_URL,
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "",
+    process.env.NEXTAUTH_URL,
+  ];
+  for (const raw of candidates) {
+    const cleaned = (raw || "").trim().replace(/\/+$/, "");
+    if (cleaned && !/localhost|127\.0\.0\.1/i.test(cleaned)) {
+      return cleaned;
+    }
+  }
+  return PRODUCTION_APP_URL;
+}
 
 function smtpConfig() {
   const host = (process.env.SMTP_HOST || "smtp.gmail.com").trim();
@@ -19,7 +36,7 @@ function smtpConfig() {
   const pass = (process.env.SMTP_PASS || "").replace(/\s+/g, "").trim();
   const from = (process.env.SMTP_FROM || (user ? `ERD & Code Studio <${user}>` : "")).trim();
   const resendKey = (process.env.RESEND_API_KEY || "").trim();
-  const baseUrl = (process.env.NEXTAUTH_URL || "http://localhost:3000").replace(/\/+$/, "");
+  const baseUrl = resolveAppBaseUrl();
   return { host, port, secure, user, pass, from, resendKey, baseUrl };
 }
 
