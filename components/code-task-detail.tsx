@@ -13,6 +13,7 @@ import CodePreviewFrame, {
 } from "@/components/code-preview-frame";
 import MultiRecipientPicker, { type RecipientAccount } from "@/components/multi-recipient-picker";
 import { CRITERION_TYPE_LABELS, createCriterionId, EMPTY_CODE_BUNDLE } from "@/lib/code-grader";
+import { playSound } from "@/lib/sound-fx";
 import type {
   CodeAutoGradeResult,
   CodeBundle,
@@ -270,6 +271,7 @@ export default function CodeTaskDetail({ taskId }: { taskId: string }) {
     setDraftRunSignal((v) => v + 1);
     const res = await evaluateCodeInSandbox(draftSolution, draftCriteria, draftThreshold);
     setDraftGradeResult(res);
+    playSound(res.passed ? "pass" : "wrong");
   };
 
   const addEmptyCriterion = () => {
@@ -479,6 +481,7 @@ export default function CodeTaskDetail({ taskId }: { taskId: string }) {
     try {
       const result = await evaluateCodeInSandbox(snapshotCode, task.criteria, task.passThreshold);
       setAutoGradeResult(result);
+      playSound(result.passed ? "pass" : "wrong");
 
       const response = await fetch(`/api/code-tasks/${taskId}`, {
         method: "PATCH",
