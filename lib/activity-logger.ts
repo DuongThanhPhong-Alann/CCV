@@ -1,4 +1,5 @@
 import { ObjectId } from "mongodb";
+import { publishActivityUpdate } from "@/lib/activity-pubsub";
 import { findAppDocument, patchAppDocument, type AppDocument } from "@/lib/app-data";
 import type {
   ActivityKind,
@@ -158,6 +159,7 @@ export async function recordUserActivity(input: RecordActivityInput): Promise<vo
         segments: segments.slice(0, MAX_SEGMENTS_PER_USER),
       };
       await patchAppDocument("users", input.userId, { activity: nextStore }, {});
+      publishActivityUpdate(input.userId);
       return;
     }
 
@@ -204,6 +206,17 @@ export async function recordUserActivity(input: RecordActivityInput): Promise<vo
         segments: segments.slice(0, MAX_SEGMENTS_PER_USER),
       };
       await patchAppDocument("users", input.userId, { activity: nextStore }, {});
+      publishActivityUpdate(input.userId);
+      return;
+    }
+
+    // Guard against stale "leave" beacons from a previous page overwriting a newer active page
+    if (
+      input.event === "leave" &&
+      store.currentSegment &&
+      (store.currentSegment.path !== input.path ||
+        (store.currentSegment.targetId ?? null) !== cleanTargetId)
+    ) {
       return;
     }
 
@@ -262,6 +275,7 @@ export async function recordUserActivity(input: RecordActivityInput): Promise<vo
       segments: segments.slice(0, MAX_SEGMENTS_PER_USER),
     };
     await patchAppDocument("users", input.userId, { activity: nextStore }, {});
+    publishActivityUpdate(input.userId);
   } catch (err) {
     console.error("[activity-logger] Failed to record activity:", err);
   }

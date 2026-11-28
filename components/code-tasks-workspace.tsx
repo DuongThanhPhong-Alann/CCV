@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import AccountAvatarButton from "@/components/account-avatar-button";
 import BatchDraftAssignBar from "@/components/batch-draft-assign-bar";
 import BoxesLoader from "@/components/boxes-loader";
+import GradientProgressBar from "@/components/gradient-progress-bar";
 import IosCheckbox from "@/components/ios-checkbox";
 import MailActionsBar from "@/components/mail-actions-bar";
 import TaskPedestalIcon, { type PedestalTone } from "@/components/task-pedestal-icon";
@@ -155,13 +156,25 @@ function getLatestAutoGrade(task: CodeTaskItem) {
   return task.lastRun?.autoGrade ?? task.submission?.autoGrade ?? null;
 }
 
+function isTaskOverdue(dueAt?: string | null): boolean {
+  if (!dueAt) return false;
+  const ms = new Date(dueAt).getTime();
+  return Number.isFinite(ms) && ms < Date.now();
+}
+
+function isCodeTaskOverdueUnpassed(task: CodeTaskItem): boolean {
+  if (task.status === "draft" || task.status === "declined") return false;
+  const autoGrade = getLatestAutoGrade(task);
+  if (autoGrade?.passed) return false;
+  return isTaskOverdue(task.dueAt);
+}
+
 function codeTaskPedestalTone(task: CodeTaskItem): PedestalTone {
   if (task.status === "draft") return "slate";
   const autoGrade = getLatestAutoGrade(task);
   if (autoGrade?.passed) return "green";
   if (task.status === "declined") return "red";
-  const isOverdue = Boolean(task.dueAt && new Date(task.dueAt).getTime() < Date.now());
-  if (isOverdue) return "red";
+  if (isCodeTaskOverdueUnpassed(task)) return "red";
   if (task.status === "invited") return "gold";
   return "blue";
 }
@@ -169,15 +182,26 @@ function codeTaskPedestalTone(task: CodeTaskItem): PedestalTone {
 function codeTaskState(task: CodeTaskItem, scope: TaskScope) {
   if (task.status === "draft") return { label: "Trong kho", tone: "draft" };
   if (task.status === "declined") return { label: "Đã từ chối", tone: "declined" };
+  const autoGrade = getLatestAutoGrade(task);
+  if (autoGrade?.passed) {
+    return { label: `PASS · ${autoGrade.percentage}%`, tone: "graded" };
+  }
+  if (isCodeTaskOverdueUnpassed(task)) {
+    if (task.status === "invited") {
+      return { label: "Quá hạn · Chưa nhận", tone: "overdue" };
+    }
+    if (autoGrade) {
+      return { label: `Quá hạn · Chưa pass (${autoGrade.percentage}%)`, tone: "overdue" };
+    }
+    return { label: "Quá hạn · Chưa pass", tone: "overdue" };
+  }
   if (task.status === "invited") {
     return scope === "received"
       ? { label: "Chờ bạn nhận bài", tone: "waiting" }
       : { label: "Đang chờ nhận", tone: "waiting" };
   }
-  const autoGrade = getLatestAutoGrade(task);
   if (autoGrade) {
-    if (autoGrade.passed) return { label: `PASS · ${autoGrade.percentage}%`, tone: "graded" };
-    return { label: `Chưa đạt · ${autoGrade.percentage}%`, tone: "submitted" };
+    return { label: `Đang code · ${autoGrade.percentage}%`, tone: "active" };
   }
   return { label: "Đang code", tone: "active" };
 }
@@ -580,12 +604,11 @@ export default function CodeTasksWorkspace() {
                     <span className="task-sub-count">▶ {selectedAssignee.totalRuns} lượt Run</span>
                   )}
                 </div>
-                <div className="code-mini-bar-track" aria-hidden="true">
-                  <div
-                    className={`code-mini-bar-fill ${selectedAssignee.passedCount === selectedAssignee.totalCount && selectedAssignee.totalCount > 0 ? "is-pass" : "is-fail"}`}
-                    style={{ width: `${selectedAssignee.passRate}%` }}
-                  />
-                </div>
+                <GradientProgressBar
+                  percentage={selectedAssignee.passRate}
+                  size="sm"
+                  ariaLabel={`Tỉ lệ hoàn thành ${selectedAssignee.passRate}%`}
+                />
               </div>
             </div>
           </section>
@@ -719,12 +742,11 @@ export default function CodeTasksWorkspace() {
                               🕒 Hoạt động gần nhất: {formatDate(group.latestActivityAt)}
                             </span>
                           </div>
-                          <div className="code-mini-bar-track" aria-hidden="true">
-                            <div
-                              className={`code-mini-bar-fill ${group.passedCount === group.totalCount && group.totalCount > 0 ? "is-pass" : "is-fail"}`}
-                              style={{ width: `${group.passRate}%` }}
-                            />
-                          </div>
+                          <GradientProgressBar
+                            percentage={group.passRate}
+                            size="sm"
+                            ariaLabel={`Tỉ lệ hoàn thành ${group.passRate}%`}
+                          />
                         </div>
                         <span className="task-list-arrow">›</span>
                       </button>
@@ -820,7 +842,9 @@ export default function CodeTasksWorkspace() {
                                 🕒 {task.lastRun?.ranAt ? `Run gần nhất: ${formatDate(task.lastRun.ranAt)}` : `Cập nhật: ${formatDate(task.updatedAt)}`}
                               </span>
                               {task.dueAt && (
-                                <span className="due-pill">⏰ Hạn: {formatDate(task.dueAt)}</span>
+                                <span className={`due-pill ${isCodeTaskOverdueUnpassed(task) ? "is-overdue" : ""}`}>
+                                  {isCodeTaskOverdueUnpassed(task) ? "⚠️ Quá hạn:" : "⏰ Hạn:"} {formatDate(task.dueAt)}
+                                </span>
                               )}
                               {scope === "drafts" && (
                                 <>
@@ -845,12 +869,11 @@ export default function CodeTasksWorkspace() {
                               )}
                             </div>
                             {scope !== "drafts" && autoGrade && (
-                              <div className="code-mini-bar-track" aria-hidden="true">
-                                <div
-                                  className={`code-mini-bar-fill ${autoGrade.passed ? "is-pass" : "is-fail"}`}
-                                  style={{ width: `${autoGrade.percentage}%` }}
-                                />
-                              </div>
+                              <GradientProgressBar
+                                percentage={autoGrade.percentage}
+                                size="sm"
+                                ariaLabel={`Tiến độ bài tập ${autoGrade.percentage}%`}
+                              />
                             )}
                           </div>
                           <span className="task-list-arrow">›</span>

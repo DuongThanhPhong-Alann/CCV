@@ -42,18 +42,37 @@ function formatShortTime(value: string) {
   });
 }
 
-function formatDuration(seconds: number) {
+function formatDuration(seconds: number, exact = false) {
   const sec = Math.max(0, Math.round(seconds));
   if (sec === 0) return "0 giây";
   if (sec < 60) return `${sec} giây`;
   const totalMinutes = Math.floor(sec / 60);
   const remSec = sec % 60;
   if (totalMinutes < 60) {
+    if (exact) return remSec > 0 ? `${totalMinutes} phút ${remSec} giây` : `${totalMinutes} phút`;
     return remSec >= 15 ? `${totalMinutes} phút ${remSec} giây` : `${totalMinutes} phút`;
   }
   const hours = Math.floor(totalMinutes / 60);
   const mins = totalMinutes % 60;
   return mins > 0 ? `${hours} giờ ${mins} phút` : `${hours} giờ`;
+}
+
+function formatRelativeSeen(value: string | null | undefined, nowMs: number) {
+  if (!value) return "Chưa có";
+  const ts = new Date(value).getTime();
+  if (Number.isNaN(ts)) return "Chưa có";
+  const diffSec = Math.max(0, Math.floor((nowMs - ts) / 1000));
+  if (diffSec < 5) return "Vừa xong";
+  if (diffSec < 60) return `${diffSec} giây trước`;
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)} phút trước`;
+  return formatDateTime(value);
+}
+
+function getLiveExtraSec(user: AdminUserActivityOverview, nowMs: number): number {
+  if (!user.isOnline || !user.currentSegment) return 0;
+  const endMs = new Date(user.currentSegment.endedAt || user.lastSeenAt || user.currentSegment.startedAt).getTime();
+  if (Number.isNaN(endMs)) return 0;
+  return Math.max(0, Math.min(180, Math.floor((nowMs - endMs) / 1000)));
 }
 
 function localDateKey(iso: string) {
@@ -115,8 +134,9 @@ export default function ActivityMonitor() {
   const [accounts, setAccounts] = useState<AdminUserActivityOverview[]>([]);
   const [generatedAt, setGeneratedAt] = useState<string>("");
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [streamStatus, setStreamStatus] = useState<"connecting" | "live" | "reconnecting">("connecting");
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
 
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -127,52 +147,161 @@ export default function ActivityMonitor() {
   const [pickedDate, setPickedDate] = useState(() => localDateKey(new Date().toISOString()));
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
 
-  const loadActivity = async (silent = false) => {
-    if (silent) setRefreshing(true);
-    else setLoading(true);
-    setError("");
-    try {
-      const [accountRes, activityRes] = await Promise.all([
-        fetch("/api/account", { cache: "no-store" }),
-        fetch("/api/admin/activity", { cache: "no-store" }),
-      ]);
-      if (accountRes.status === 401 || activityRes.status === 401) {
-        router.replace("/login");
-        return;
-      }
-      if (activityRes.status === 403) {
-        router.replace("/");
-        return;
-      }
-      const accountJson = await readJsonResponse<{ user?: Account }>(accountRes);
-      if (accountJson.user) setAccount(accountJson.user);
-
-      const activityJson = await readJsonResponse<{
-        error?: string;
-        generatedAt?: string;
-        accounts?: AdminUserActivityOverview[];
-      }>(activityRes);
-      if (!activityRes.ok) throw new Error(activityJson.error || "Không thể tải dữ liệu hoạt động.");
-      setAccounts(activityJson.accounts ?? []);
-      setGeneratedAt(activityJson.generatedAt ?? new Date().toISOString());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Không thể tải dữ liệu hoạt động.");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
   useEffect(() => {
-    void loadActivity(false);
-  }, []);
+    let disposed = false;
+    let source: EventSource | null = null;
+    let fallbackPollTimer: number | null = null;
+    let sseLive = false;
+
+    const applySnapshot = (snapshot: { generatedAt?: string; accounts?: AdminUserActivityOverview[] }) => {
+      if (disposed) return;
+      if (Array.isArray(snapshot.accounts)) {
+        setAccounts(snapshot.accounts);
+      }
+      setGeneratedAt(snapshot.generatedAt ?? new Date().toISOString());
+      setError("");
+      setLoading(false);
+    };
+
+    const fetchRestSnapshot = async () => {
+      try {
+        const res = await fetch("/api/admin/activity", { cache: "no-store" });
+        if (disposed) return;
+        if (res.status === 401) {
+          router.replace("/login");
+          return;
+        }
+        if (res.status === 403) {
+          router.replace("/");
+          return;
+        }
+        if (!res.ok) return;
+        const json = await readJsonResponse<{
+          generatedAt?: string;
+          accounts?: AdminUserActivityOverview[];
+        }>(res);
+        applySnapshot(json);
+      } catch {
+        // transient network error; stream/fallback will retry automatically
+      }
+    };
+
+    // Initial account + activity fetch so first paint is immediate
+    const boot = async () => {
+      try {
+        const [accountRes, activityRes] = await Promise.all([
+          fetch("/api/account", { cache: "no-store" }),
+          fetch("/api/admin/activity", { cache: "no-store" }),
+        ]);
+        if (disposed) return;
+        if (accountRes.status === 401 || activityRes.status === 401) {
+          router.replace("/login");
+          return;
+        }
+        if (activityRes.status === 403) {
+          router.replace("/");
+          return;
+        }
+        const accountJson = await readJsonResponse<{ user?: Account }>(accountRes);
+        if (accountJson.user) setAccount(accountJson.user);
+
+        const activityJson = await readJsonResponse<{
+          error?: string;
+          generatedAt?: string;
+          accounts?: AdminUserActivityOverview[];
+        }>(activityRes);
+        if (!activityRes.ok) throw new Error(activityJson.error || "Không thể tải dữ liệu hoạt động.");
+        applySnapshot(activityJson);
+      } catch (err) {
+        if (!disposed) {
+          setError(err instanceof Error ? err.message : "Không thể tải dữ liệu hoạt động.");
+          setLoading(false);
+        }
+      }
+    };
+
+    void boot();
+
+    // Real-time Server-Sent Events stream (pushes changes immediately with zero manual refresh)
+    if (typeof window !== "undefined" && typeof window.EventSource !== "undefined") {
+      source = new EventSource("/api/admin/activity/stream");
+
+      source.addEventListener("open", () => {
+        if (disposed) return;
+        sseLive = true;
+        setStreamStatus("live");
+      });
+
+      source.addEventListener("snapshot", (ev) => {
+        if (disposed) return;
+        sseLive = true;
+        setStreamStatus("live");
+        try {
+          const parsed = JSON.parse((ev as MessageEvent).data) as {
+            generatedAt?: string;
+            accounts?: AdminUserActivityOverview[];
+          };
+          applySnapshot(parsed);
+        } catch {
+          // ignore malformed event
+        }
+      });
+
+      source.addEventListener("error", () => {
+        if (disposed) return;
+        sseLive = false;
+        setStreamStatus("reconnecting");
+      });
+    } else {
+      setStreamStatus("reconnecting");
+    }
+
+    // Automatic fast fallback polling (3s) whenever SSE is reconnecting or unsupported
+    fallbackPollTimer = window.setInterval(() => {
+      if (disposed || sseLive) return;
+      void fetchRestSnapshot();
+    }, 3_000);
+
+    // 1-second live clock tick for smooth real-time elapsed timers & relative timestamps
+    const clockTimer = window.setInterval(() => {
+      if (!disposed) setNowMs(Date.now());
+    }, 1_000);
+
+    const handleResume = () => {
+      if (disposed) return;
+      setNowMs(Date.now());
+      void fetchRestSnapshot();
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") handleResume();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", handleResume);
+
+    return () => {
+      disposed = true;
+      source?.close();
+      if (fallbackPollTimer !== null) window.clearInterval(fallbackPollTimer);
+      window.clearInterval(clockTimer);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", handleResume);
+    };
+  }, [router]);
 
   const scopedAccounts = includeSelf ? accounts : accounts.filter((a) => !a.isSelf);
   const onlineCount = scopedAccounts.filter((a) => a.isOnline).length;
   const activeTodayCount = scopedAccounts.filter(
-    (a) => a.todayDurationSec > 0 || (a.lastSeenAt && localDateKey(a.lastSeenAt) === localDateKey(new Date().toISOString())),
+    (a) =>
+      a.isOnline ||
+      a.todayDurationSec > 0 ||
+      (a.lastSeenAt && localDateKey(a.lastSeenAt) === localDateKey(new Date(nowMs).toISOString())),
   ).length;
-  const totalTodaySec = scopedAccounts.reduce((sum, a) => sum + a.todayDurationSec, 0);
+  const totalTodaySec = scopedAccounts.reduce(
+    (sum, a) => sum + a.todayDurationSec + getLiveExtraSec(a, nowMs),
+    0,
+  );
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const filteredAccounts = scopedAccounts.filter((a) => {
@@ -276,17 +405,19 @@ export default function ActivityMonitor() {
             </p>
           </div>
           <div className="activity-head-actions">
+            <span className={`activity-realtime-pill is-${streamStatus}`}>
+              <span className="activity-realtime-dot" />
+              {streamStatus === "live"
+                ? "TRỰC TIẾP · REALTIME"
+                : streamStatus === "connecting"
+                  ? "ĐANG KẾT NỐI TRỰC TIẾP…"
+                  : "ĐANG ĐỒNG BỘ TỰ ĐỘNG…"}
+            </span>
             {generatedAt && (
-              <span className="activity-updated-tag">Cập nhật: {formatTime(generatedAt)}</span>
+              <span className="activity-updated-tag">
+                Đồng bộ: {formatTime(generatedAt)}
+              </span>
             )}
-            <button
-              type="button"
-              className="code-secondary-button"
-              disabled={refreshing}
-              onClick={() => void loadActivity(true)}
-            >
-              {refreshing ? "Đang tải lại…" : "🔄 Làm mới"}
-            </button>
           </div>
         </div>
 
@@ -308,7 +439,7 @@ export default function ActivityMonitor() {
               <div className="activity-kpi-card is-online">
                 <span>🟢 Đang trực tuyến</span>
                 <strong>{onlineCount}</strong>
-                <small>Đang tương tác trong 2 phút qua</small>
+                <small>Tự động cập nhật trực tiếp</small>
               </div>
               <div className="activity-kpi-card">
                 <span>📅 Hoạt động hôm nay</span>
@@ -317,8 +448,8 @@ export default function ActivityMonitor() {
               </div>
               <div className="activity-kpi-card">
                 <span>⏱ Tổng thời gian hôm nay</span>
-                <strong>{formatDuration(totalTodaySec)}</strong>
-                <small>Tổng thời gian làm bài hôm nay</small>
+                <strong>{formatDuration(totalTodaySec, onlineCount > 0)}</strong>
+                <small>Cộng dồn liên tục theo thời gian thực</small>
               </div>
             </div>
 
@@ -372,9 +503,13 @@ export default function ActivityMonitor() {
             {filteredAccounts.length > 0 ? (
               <div className="task-list">
                 {filteredAccounts.map((u) => {
+                  const extraSec = getLiveExtraSec(u, nowMs);
+                  const liveTodaySec = u.todayDurationSec + extraSec;
+                  const liveTotalSec = u.totalDurationSec + extraSec;
+                  const liveCurrentSec = u.currentSegment ? u.currentSegment.durationSec + extraSec : 0;
                   const tone = u.isOnline
                     ? "graded"
-                    : u.todayDurationSec > 0
+                    : liveTodaySec > 0
                       ? "active"
                       : u.lastSeenAt
                         ? "waiting"
@@ -410,17 +545,18 @@ export default function ActivityMonitor() {
                           <div className="activity-live-banner">
                             <span className="online-inline-dot" />
                             <span>
-                              Đang mở: <strong>{u.currentSegment.title}</strong> (từ {formatShortTime(u.currentSegment.startedAt)})
+                              Đang mở: <strong>{u.currentSegment.title}</strong> · từ{" "}
+                              {formatShortTime(u.currentSegment.startedAt)} ({formatDuration(liveCurrentSec, true)})
                             </span>
                           </div>
                         )}
 
                         <div className="task-card-meta-row">
                           <span className="assignee-count-pill">
-                            ⏱ Hôm nay: {formatDuration(u.todayDurationSec)}
+                            ⏱ Hôm nay: {formatDuration(liveTodaySec, u.isOnline)}
                           </span>
                           <span className="assignee-stat-pill">
-                            📊 Tổng: {formatDuration(u.totalDurationSec)}
+                            📊 Tổng: {formatDuration(liveTotalSec, u.isOnline)}
                           </span>
                           <span className="task-sub-count">
                             📝 {u.taskWorkSummaries.length} bài/sơ đồ đã theo dõi
@@ -431,7 +567,7 @@ export default function ActivityMonitor() {
                             </span>
                           )}
                           <span className="task-list-date">
-                            🕒 Hoạt động cuối: {formatDateTime(u.lastSeenAt)}
+                            🕒 Hoạt động cuối: {formatRelativeSeen(u.lastSeenAt, nowMs)}
                           </span>
                         </div>
                       </div>
@@ -497,26 +633,27 @@ export default function ActivityMonitor() {
                       <span className="online-inline-dot" />
                       <span>
                         Đang làm ngay lúc này: <strong>{selectedUser.currentSegment.title}</strong> · bắt đầu lúc{" "}
-                        {formatTime(selectedUser.currentSegment.startedAt)}
+                        {formatTime(selectedUser.currentSegment.startedAt)} (
+                        {formatDuration(selectedUser.currentSegment.durationSec + getLiveExtraSec(selectedUser, nowMs), true)})
                       </span>
                     </div>
                   )}
 
                   <div className="task-card-meta-row">
                     <span className="assignee-count-pill">
-                      ⏱ Hôm nay: {formatDuration(selectedUser.todayDurationSec)}
+                      ⏱ Hôm nay: {formatDuration(selectedUser.todayDurationSec + getLiveExtraSec(selectedUser, nowMs), selectedUser.isOnline)}
                     </span>
                     <span className="task-grade-pill">
-                      📅 7 ngày qua: {formatDuration(selectedUser.weekDurationSec)}
+                      📅 7 ngày qua: {formatDuration(selectedUser.weekDurationSec + getLiveExtraSec(selectedUser, nowMs), selectedUser.isOnline)}
                     </span>
                     <span className="assignee-stat-pill">
-                      📊 Tổng cộng: {formatDuration(selectedUser.totalDurationSec)}
+                      📊 Tổng cộng: {formatDuration(selectedUser.totalDurationSec + getLiveExtraSec(selectedUser, nowMs), selectedUser.isOnline)}
                     </span>
                     <span className="task-list-date">
                       🔑 Đăng nhập gần nhất: {formatDateTime(selectedUser.lastLoginAt)}
                     </span>
                     <span className="task-list-date">
-                      🕒 Hoạt động cuối: {formatDateTime(selectedUser.lastSeenAt)}
+                      🕒 Hoạt động cuối: {formatRelativeSeen(selectedUser.lastSeenAt, nowMs)}
                     </span>
                   </div>
                 </div>
@@ -667,7 +804,9 @@ export default function ActivityMonitor() {
                                       {formatShortTime(seg.startedAt)} → {isLiveNow ? "Hiện tại" : formatShortTime(seg.endedAt)}
                                     </span>
                                     <span className="activity-duration-badge">
-                                      {isLiveNow ? `Đang làm · ${formatDuration(seg.durationSec)}` : formatDuration(seg.durationSec)}
+                                      {isLiveNow
+                                        ? `Đang làm · ${formatDuration(seg.durationSec + getLiveExtraSec(selectedUser, nowMs), true)}`
+                                        : formatDuration(seg.durationSec)}
                                     </span>
                                   </>
                                 )}

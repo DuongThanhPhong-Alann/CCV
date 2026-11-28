@@ -93,55 +93,72 @@ export function formatVietnamDateTime(value: Date | string | null | undefined) {
 
 type MailTheme = "blue" | "amber" | "violet" | "emerald";
 
+const MAIL_NAVY = "#000241";
+const MAIL_FONT_PLAYFUL = "'Comic Sans MS','Chalkboard SE','Trebuchet MS','Segoe UI',Arial,sans-serif";
+const MAIL_FONT_BODY = "'Trebuchet MS','Segoe UI',Arial,Helvetica,sans-serif";
+
 const THEMES: Record<
   MailTheme,
   {
     headerBg: string;
     accent: string;
     softBg: string;
-    softBorder: string;
-    pillBg: string;
-    pillText: string;
+    badgeBg: string;
+    badgeText: string;
     btnBg: string;
+    btnText: string;
   }
 > = {
   blue: {
-    headerBg: "linear-gradient(135deg,#0f172a 0%,#1d4ed8 58%,#2563eb 100%)",
+    headerBg: "linear-gradient(180deg,#dbeafe 0%,#eff6ff 100%)",
     accent: "#2563eb",
     softBg: "#eff6ff",
-    softBorder: "#bfdbfe",
-    pillBg: "rgba(255,255,255,0.18)",
-    pillText: "#eff6ff",
-    btnBg: "linear-gradient(135deg,#2563eb,#1d4ed8)",
+    badgeBg: "#2563eb",
+    badgeText: "#ffffff",
+    btnBg: "#2563eb",
+    btnText: "#ffffff",
   },
   amber: {
-    headerBg: "linear-gradient(135deg,#7c2d12 0%,#d97706 55%,#f59e0b 100%)",
-    accent: "#d97706",
-    softBg: "#fffbeb",
-    softBorder: "#fde68a",
-    pillBg: "rgba(255,255,255,0.2)",
-    pillText: "#fffbeb",
-    btnBg: "linear-gradient(135deg,#d97706,#b45309)",
+    headerBg: "linear-gradient(180deg,#dbeafe 0%,#eff6ff 100%)",
+    accent: "#1d4ed8",
+    softBg: "#eff6ff",
+    badgeBg: "#1d4ed8",
+    badgeText: "#ffffff",
+    btnBg: "#2563eb",
+    btnText: "#ffffff",
   },
   violet: {
-    headerBg: "linear-gradient(135deg,#312e81 0%,#4f46e5 55%,#7c3aed 100%)",
-    accent: "#4f46e5",
-    softBg: "#eef2ff",
-    softBorder: "#c7d2fe",
-    pillBg: "rgba(255,255,255,0.18)",
-    pillText: "#eef2ff",
-    btnBg: "linear-gradient(135deg,#4f46e5,#6d28d9)",
+    headerBg: "linear-gradient(180deg,#dbeafe 0%,#eff6ff 100%)",
+    accent: "#1d4ed8",
+    softBg: "#eff6ff",
+    badgeBg: "#1e40af",
+    badgeText: "#ffffff",
+    btnBg: "#2563eb",
+    btnText: "#ffffff",
   },
   emerald: {
-    headerBg: "linear-gradient(135deg,#064e3b 0%,#059669 58%,#10b981 100%)",
-    accent: "#059669",
-    softBg: "#ecfdf5",
-    softBorder: "#a7f3d0",
-    pillBg: "rgba(255,255,255,0.18)",
-    pillText: "#ecfdf5",
-    btnBg: "linear-gradient(135deg,#059669,#047857)",
+    headerBg: "linear-gradient(180deg,#dbeafe 0%,#eff6ff 100%)",
+    accent: "#2563eb",
+    softBg: "#eff6ff",
+    badgeBg: "#2563eb",
+    badgeText: "#ffffff",
+    btnBg: "#2563eb",
+    btnText: "#ffffff",
   },
 };
+
+const MAIL_DOUBLE_BOX = `border:4px double ${MAIL_NAVY};border-radius:12px;background:#ffffff;box-shadow:2px 3px 0 ${MAIL_NAVY};`;
+const MAIL_DOUBLE_BOX_BLUE = `border:4px double ${MAIL_NAVY};border-radius:12px;background:#eff6ff;box-shadow:2px 3px 0 ${MAIL_NAVY};`;
+
+function mailPrimaryButton(href: string, label: string) {
+  return `<a href="${escHtml(href)}" style="display:inline-block;padding:11px 24px;border-radius:10px;border:2px solid ${MAIL_NAVY};background-color:#2563eb;color:#ffffff;text-decoration:none;font-family:${MAIL_FONT_PLAYFUL};font-weight:700;font-size:15px;box-shadow:2px 3px 0 ${MAIL_NAVY};">${label}</a>`;
+}
+
+function mailMiniButton(href: string, label: string, filled = false) {
+  const bg = filled ? "#2563eb" : "#ffffff";
+  const fg = filled ? "#ffffff" : "#1d4ed8";
+  return `<a href="${escHtml(href)}" style="display:inline-block;padding:7px 13px;border-radius:10px;border:2px solid ${MAIL_NAVY};background-color:${bg};color:${fg};font-family:${MAIL_FONT_PLAYFUL};font-size:12px;font-weight:700;text-decoration:none;box-shadow:2px 3px 0 ${MAIL_NAVY};">${label}</a>`;
+}
 
 function wrapEmailLayout(
   title: string,
@@ -153,59 +170,49 @@ function wrapEmailLayout(
   const t = THEMES[themeName];
   return `<!DOCTYPE html>
 <html lang="vi">
-<body style="margin:0;padding:0;background-color:#eef2f7;background-image:radial-gradient(#cbd5e1 1px, transparent 1px);background-size:18px 18px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;color:#0f172a;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="padding:28px 14px;">
+<body style="margin:0;padding:0;background-color:#dbeafe;background-image:radial-gradient(#93c5fd 1.2px, transparent 1.2px);background-size:18px 18px;font-family:${MAIL_FONT_BODY};color:${MAIL_NAVY};">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="padding:32px 14px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:620px;background:#ffffff;border:1px solid #cbd5e1;border-radius:18px;overflow:hidden;box-shadow:0 14px 34px rgba(15,23,42,0.10);">
-          <!-- Top ornamental ribbon -->
+        <!-- Main vishal2231179 inspired card (White & Blue dominant) -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;background-color:#ffffff;border:2.5px solid ${MAIL_NAVY};border-radius:20px;overflow:hidden;box-shadow:5px 5px 0 ${MAIL_NAVY};">
+          <!-- Top Blue Ribbon -->
           <tr>
-            <td style="height:5px;background:linear-gradient(90deg,#2563eb 0%,#7c3aed 33%,#ec4899 66%,#f59e0b 100%);font-size:0;line-height:0;">&nbsp;</td>
+            <td style="height:8px;background:linear-gradient(90deg,#1d4ed8 0%,#2563eb 50%,#60a5fa 100%);font-size:0;line-height:0;">&nbsp;</td>
           </tr>
-          <!-- Patterned Hero Header -->
+          <!-- Centered Playful Header -->
           <tr>
-            <td style="background:${t.headerBg};padding:26px 28px 24px;color:#ffffff;position:relative;">
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                <tr>
-                  <td>
-                    <span style="display:inline-block;padding:4px 12px;border-radius:999px;background:${t.pillBg};border:1px solid rgba(255,255,255,0.28);color:${t.pillText};font-size:11px;font-weight:800;letter-spacing:0.9px;text-transform:uppercase;">
-                      &#10022; ${escHtml(badge)} &#10022;
-                    </span>
-                  </td>
-                  <td align="right" style="font-size:18px;letter-spacing:4px;opacity:0.45;color:#ffffff;">
-                    &#9672; &#10023; &#9672;
-                  </td>
-                </tr>
-              </table>
-              <h1 style="margin:12px 0 0;font-size:22px;line-height:1.35;font-weight:800;color:#ffffff;">${escHtml(title)}</h1>
+            <td align="center" style="background:${t.headerBg};padding:26px 28px 22px;border-bottom:4px double ${MAIL_NAVY};">
+              <div style="margin-bottom:12px;">
+                <span style="display:inline-block;padding:5px 14px;border-radius:10px;background-color:${t.badgeBg};border:2px solid ${MAIL_NAVY};box-shadow:2px 3px 0 ${MAIL_NAVY};color:${t.badgeText};font-family:${MAIL_FONT_PLAYFUL};font-size:11px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;">
+                  &#10022; ${escHtml(badge)} &#10022;
+                </span>
+              </div>
+              <h1 style="margin:0;font-family:${MAIL_FONT_PLAYFUL};font-size:24px;line-height:1.35;font-weight:700;color:${MAIL_NAVY};text-align:center;">
+                ${escHtml(title)}
+              </h1>
               ${
                 subtitle
-                  ? `<p style="margin:6px 0 0;font-size:13px;line-height:1.5;color:rgba(255,255,255,0.88);">${escHtml(subtitle)}</p>`
+                  ? `<p style="margin:8px 0 0;font-family:${MAIL_FONT_BODY};font-size:13.5px;line-height:1.5;font-weight:600;color:#1d4ed8;text-align:center;">${escHtml(subtitle)}</p>`
                   : ""
               }
-              <div style="margin-top:14px;height:1px;background:linear-gradient(90deg,rgba(255,255,255,0.45),rgba(255,255,255,0.05));"></div>
             </td>
           </tr>
 
           <!-- Main Body -->
           <tr>
-            <td style="padding:24px 28px;font-size:14px;line-height:1.65;color:#334155;">
+            <td style="padding:26px 28px 22px;background-color:#ffffff;font-family:${MAIL_FONT_BODY};font-size:14.5px;line-height:1.68;color:#0f172a;">
               ${bodyHtml}
             </td>
           </tr>
 
-          <!-- Decorative Divider + Footer -->
+          <!-- Footer -->
           <tr>
-            <td style="padding:0 28px;">
-              <div style="text-align:center;color:#94a3b8;font-size:12px;letter-spacing:8px;border-top:1px dashed #cbd5e1;padding-top:12px;">
-                &#9672; &#10022; &#9672;
+            <td style="padding:16px 28px 22px;background-color:#eff6ff;border-top:4px double ${MAIL_NAVY};text-align:center;font-family:${MAIL_FONT_BODY};font-size:12px;line-height:1.6;color:#1e3a8a;">
+              <div style="font-family:${MAIL_FONT_PLAYFUL};font-size:13px;font-weight:700;color:${MAIL_NAVY};margin-bottom:2px;">
+                ERD Draw &amp; Code Practice Studio
               </div>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:12px 28px 20px;background:#ffffff;text-align:center;font-size:12px;line-height:1.6;color:#64748b;">
-              Thông báo tự động từ <strong style="color:#1e293b;">ERD Draw &amp; Code Practice Studio</strong><br>
-              <span style="color:#94a3b8;">Hệ thống thực hành Thiết kế Cơ sở dữ liệu &amp; Lập trình Web trực tuyến</span>
+              <span style="color:#3b5998;">Thông báo tự động · Hệ thống thực hành Thiết kế Cơ sở dữ liệu &amp; Lập trình Web</span>
             </td>
           </tr>
         </table>
@@ -285,14 +292,14 @@ export async function sendWelcomeEmail(params: { toEmail: string; toName: string
   const { baseUrl } = smtpConfig();
   const subject = "Chào mừng bạn tham gia ERD Draw & Code Studio";
   const bodyHtml = `
-    <p style="margin-top:0;">Xin chào <strong style="color:#0f172a;">${escHtml(params.toName)}</strong>,</p>
-    <p>Tài khoản của bạn với email <strong>${escHtml(params.toEmail)}</strong> đã sẵn sàng trên hệ thống thực hành vẽ sơ đồ ERD &amp; lập trình Web.</p>
-    <div style="margin:16px 0;padding:14px 16px;border-radius:12px;background:#eff6ff;border:1px solid #bfdbfe;">
-      <div style="font-weight:700;color:#1d4ed8;margin-bottom:4px;">&#128640; Bắt đầu ngay hôm nay</div>
-      <div style="font-size:13px;color:#334155;">Nhận bài tập từ giảng viên, viết code trực tiếp trên web, chạy kiểm thử tự động và theo dõi tiến độ từng ngày.</div>
+    <p style="margin-top:0;">Xin chào <strong style="color:${MAIL_NAVY};">${escHtml(params.toName)}</strong>,</p>
+    <p>Tài khoản của bạn với email <strong style="color:#1d4ed8;">${escHtml(params.toEmail)}</strong> đã sẵn sàng trên hệ thống thực hành vẽ sơ đồ ERD &amp; lập trình Web.</p>
+    <div style="margin:18px 0;padding:15px 18px;${MAIL_DOUBLE_BOX_BLUE}">
+      <div style="font-family:${MAIL_FONT_PLAYFUL};font-weight:700;font-size:15px;color:#1d4ed8;margin-bottom:5px;">&#128640; Bắt đầu ngay hôm nay</div>
+      <div style="font-size:13.5px;color:#1e293b;">Nhận bài tập từ giảng viên, viết code trực tiếp trên web, chạy kiểm thử tự động và theo dõi tiến độ từng ngày.</div>
     </div>
-    <p style="margin:22px 0 6px;text-align:center;">
-      <a href="${escHtml(baseUrl)}/login" style="display:inline-block;padding:11px 24px;border-radius:10px;background:${THEMES.blue.btnBg};color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;">Đăng nhập vào hệ thống &rarr;</a>
+    <p style="margin:24px 0 6px;text-align:center;">
+      ${mailPrimaryButton(`${baseUrl}/login`, "Đăng nhập vào hệ thống &rarr;")}
     </p>
   `;
   const text = `Xin chào ${params.toName},\nTài khoản (${params.toEmail}) của bạn đã được đăng ký thành công.\nĐăng nhập tại: ${baseUrl}/login`;
@@ -337,28 +344,28 @@ export async function sendTasksAssignedEmail(params: {
       const chips: string[] = [];
       if (t.category) {
         chips.push(
-          `<span style="display:inline-block;padding:2px 8px;border-radius:999px;background:#e0e7ff;color:#3730a3;font-size:11px;font-weight:700;margin-right:6px;">${escHtml(t.category)}</span>`,
+          `<span style="display:inline-block;padding:2px 9px;border-radius:8px;background:#dbeafe;border:1.5px solid ${MAIL_NAVY};color:#1e3a8a;font-size:11px;font-weight:700;margin-right:6px;">${escHtml(t.category)}</span>`,
         );
       }
       if (t.difficulty) {
         chips.push(
-          `<span style="display:inline-block;padding:2px 8px;border-radius:999px;background:#f1f5f9;color:#334155;font-size:11px;font-weight:700;margin-right:6px;">${escHtml(t.difficulty)}</span>`,
+          `<span style="display:inline-block;padding:2px 9px;border-radius:8px;background:#ffffff;border:1.5px solid ${MAIL_NAVY};color:${MAIL_NAVY};font-size:11px;font-weight:700;margin-right:6px;">${escHtml(t.difficulty)}</span>`,
         );
       }
       if (itemDue) {
         chips.push(
-          `<span style="display:inline-block;padding:2px 8px;border-radius:999px;background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;">&#9200; Hạn: ${escHtml(itemDue)}</span>`,
+          `<span style="display:inline-block;padding:2px 9px;border-radius:8px;background:#eff6ff;border:1.5px solid #2563eb;color:#1d4ed8;font-size:11px;font-weight:700;">&#9200; Hạn: ${escHtml(itemDue)}</span>`,
         );
       }
-      return `<li style="margin-bottom:10px;padding:12px 14px;border:1px solid #dbeafe;border-left:4px solid #2563eb;border-radius:10px;background:#f8fbff;">
+      return `<li style="margin-bottom:12px;padding:13px 15px;${MAIL_DOUBLE_BOX}">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
           <tr>
             <td style="vertical-align:top;">
-              <div style="font-size:14px;font-weight:800;color:#0f172a;">${index + 1}. ${escHtml(t.title)}</div>
-              ${chips.length ? `<div style="margin-top:6px;">${chips.join("")}</div>` : ""}
+              <div style="font-family:${MAIL_FONT_PLAYFUL};font-size:14.5px;font-weight:700;color:${MAIL_NAVY};">${index + 1}. ${escHtml(t.title)}</div>
+              ${chips.length ? `<div style="margin-top:7px;">${chips.join("")}</div>` : ""}
             </td>
             <td align="right" style="vertical-align:middle;white-space:nowrap;padding-left:10px;">
-              <a href="${escHtml(link)}" style="display:inline-block;padding:6px 12px;border-radius:8px;background:#ffffff;border:1px solid #93c5fd;color:#1d4ed8;font-size:12px;font-weight:700;text-decoration:none;">Làm bài &rarr;</a>
+              ${mailMiniButton(link, "Làm bài &rarr;")}
             </td>
           </tr>
         </table>
@@ -368,18 +375,18 @@ export async function sendTasksAssignedEmail(params: {
 
   const listUrl = `${baseUrl}${routePrefix}`;
   const bodyHtml = `
-    <p style="margin-top:0;">Xin chào <strong style="color:#0f172a;">${escHtml(params.toName)}</strong>,</p>
-    <p><strong>${escHtml(params.assignerName)}</strong> (<span style="color:#2563eb;">${escHtml(params.assignerEmail)}</span>) vừa giao cho bạn <strong>${params.tasks.length}</strong> ${kindLabel.toLowerCase()}.</p>
+    <p style="margin-top:0;">Xin chào <strong style="color:${MAIL_NAVY};">${escHtml(params.toName)}</strong>,</p>
+    <p><strong style="color:${MAIL_NAVY};">${escHtml(params.assignerName)}</strong> (<span style="color:#2563eb;font-weight:600;">${escHtml(params.assignerEmail)}</span>) vừa giao cho bạn <strong style="color:#1d4ed8;">${params.tasks.length}</strong> ${kindLabel.toLowerCase()}.</p>
     ${
       dueTextBanner
-        ? `<div style="margin:14px 0;padding:11px 14px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:13px;">
-            <strong>&#9200; Hạn nộp bài:</strong> ${escHtml(dueTextBanner)} <span style="opacity:0.85;">(Giờ Việt Nam)</span>
+        ? `<div style="margin:15px 0;padding:12px 15px;${MAIL_DOUBLE_BOX_BLUE}color:${MAIL_NAVY};font-size:13.5px;">
+            <strong style="color:#1d4ed8;">&#9200; Hạn nộp bài:</strong> <strong>${escHtml(dueTextBanner)}</strong> <span style="color:#3b5998;">(Giờ Việt Nam)</span>
           </div>`
         : ""
     }
     <ul style="list-style:none;padding:0;margin:16px 0;">${itemsHtml}</ul>
-    <p style="margin:22px 0 6px;text-align:center;">
-      <a href="${escHtml(listUrl)}" style="display:inline-block;padding:11px 24px;border-radius:10px;background:${THEMES.blue.btnBg};color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;">Mở danh sách bài tập &rarr;</a>
+    <p style="margin:24px 0 6px;text-align:center;">
+      ${mailPrimaryButton(listUrl, "Mở danh sách bài tập &rarr;")}
     </p>
   `;
 
@@ -420,14 +427,14 @@ export async function sendDueDateUpdatedEmail(params: {
   const dueText = params.dueAt ? formatVietnamDateTime(params.dueAt) : "Không giới hạn thời gian";
   const subject = `[Cập nhật hạn nộp] ${params.title}`;
   const bodyHtml = `
-    <p style="margin-top:0;">Xin chào <strong style="color:#0f172a;">${escHtml(params.toName)}</strong>,</p>
-    <p><strong>${escHtml(params.updaterName)}</strong> vừa điều chỉnh thời hạn làm bài cho <strong>${escHtml(params.title)}</strong>:</p>
-    <div style="margin:14px 0;padding:14px 16px;border-radius:12px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;">
-      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;">&#128197; Hạn nộp mới</div>
-      <div style="font-size:17px;font-weight:800;margin-top:4px;">${escHtml(dueText)}</div>
+    <p style="margin-top:0;">Xin chào <strong style="color:${MAIL_NAVY};">${escHtml(params.toName)}</strong>,</p>
+    <p><strong>${escHtml(params.updaterName)}</strong> vừa điều chỉnh thời hạn làm bài cho <strong style="color:#1d4ed8;">${escHtml(params.title)}</strong>:</p>
+    <div style="margin:16px 0;padding:16px 18px;${MAIL_DOUBLE_BOX_BLUE}text-align:center;">
+      <div style="font-family:${MAIL_FONT_PLAYFUL};font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:#1d4ed8;">&#128197; Hạn nộp mới</div>
+      <div style="font-family:${MAIL_FONT_PLAYFUL};font-size:19px;font-weight:700;color:${MAIL_NAVY};margin-top:5px;">${escHtml(dueText)}</div>
     </div>
-    <p style="margin:20px 0 6px;text-align:center;">
-      <a href="${escHtml(taskUrl)}" style="display:inline-block;padding:11px 22px;border-radius:10px;background:${THEMES.amber.btnBg};color:#ffffff;text-decoration:none;font-weight:700;">Xem chi tiết bài tập &rarr;</a>
+    <p style="margin:22px 0 6px;text-align:center;">
+      ${mailPrimaryButton(taskUrl, "Xem chi tiết bài tập &rarr;")}
     </p>
   `;
   const text = `Xin chào ${params.toName},\n${params.updaterName} vừa cập nhật hạn nộp bài "${params.title}" thành: ${dueText}.\nXem tại: ${taskUrl}`;
@@ -456,19 +463,19 @@ export async function sendTaskGradedEmail(params: {
   const subject = `[Kết quả chấm điểm] ${params.title}: ${params.score}/10 điểm`;
 
   const bodyHtml = `
-    <p style="margin-top:0;">Xin chào <strong style="color:#0f172a;">${escHtml(params.toName)}</strong>,</p>
-    <p><strong>${escHtml(params.graderName)}</strong> vừa chấm điểm bài làm của bạn cho ${kindLabel.toLowerCase()} <strong>${escHtml(params.title)}</strong>:</p>
-    <div style="margin:16px 0;padding:18px 20px;border-radius:12px;background:#ecfdf5;border:1px solid #a7f3d0;text-align:center;">
-      <div style="font-size:12px;font-weight:800;letter-spacing:0.8px;color:#065f46;text-transform:uppercase;">ĐIỂM ĐÁNH GIÁ</div>
-      <div style="font-size:30px;font-weight:900;color:#047857;margin-top:4px;">${escHtml(params.score)} <span style="font-size:16px;font-weight:700;color:#059669;">/ 10 điểm</span></div>
+    <p style="margin-top:0;">Xin chào <strong style="color:${MAIL_NAVY};">${escHtml(params.toName)}</strong>,</p>
+    <p><strong>${escHtml(params.graderName)}</strong> vừa chấm điểm bài làm của bạn cho ${kindLabel.toLowerCase()} <strong style="color:#1d4ed8;">${escHtml(params.title)}</strong>:</p>
+    <div style="margin:18px 0;padding:18px 20px;${MAIL_DOUBLE_BOX_BLUE}text-align:center;">
+      <div style="font-family:${MAIL_FONT_PLAYFUL};font-size:12px;font-weight:700;letter-spacing:0.8px;color:#1d4ed8;text-transform:uppercase;">ĐIỂM ĐÁNH GIÁ</div>
+      <div style="font-family:${MAIL_FONT_PLAYFUL};font-size:32px;font-weight:700;color:${MAIL_NAVY};margin-top:4px;">${escHtml(params.score)} <span style="font-size:16px;font-weight:700;color:#2563eb;">/ 10 điểm</span></div>
       ${
         params.feedback
-          ? `<div style="margin-top:12px;padding-top:12px;border-top:1px dashed #6ee7b7;text-align:left;color:#064e3b;font-size:13.5px;"><strong>&#128172; Nhận xét:</strong> ${escHtml(params.feedback)}</div>`
+          ? `<div style="margin-top:12px;padding-top:12px;border-top:2px dashed #93c5fd;text-align:left;color:#0f172a;font-size:13.5px;"><strong style="color:#1d4ed8;">&#128172; Nhận xét:</strong> ${escHtml(params.feedback)}</div>`
           : ""
       }
     </div>
-    <p style="margin:20px 0 6px;text-align:center;">
-      <a href="${escHtml(taskUrl)}" style="display:inline-block;padding:11px 24px;border-radius:10px;background:${THEMES.emerald.btnBg};color:#ffffff;text-decoration:none;font-weight:700;">Xem chi tiết kết quả &rarr;</a>
+    <p style="margin:22px 0 6px;text-align:center;">
+      ${mailPrimaryButton(taskUrl, "Xem chi tiết kết quả &rarr;")}
     </p>
   `;
   const text = `Xin chào ${params.toName},\n${params.graderName} vừa chấm điểm bài "${params.title}": ${params.score}/10 điểm.${params.feedback ? `\nNhận xét: ${params.feedback}` : ""}\nXem chi tiết: ${taskUrl}`;
@@ -507,13 +514,13 @@ export async function sendCodePassedNotificationEmails(params: {
 
   if (params.studentEmail) {
     const bodyHtml = `
-      <p style="margin-top:0;">Xin chào <strong style="color:#0f172a;">${escHtml(params.studentName)}</strong>,</p>
-      <p>Chúc mừng bạn đã hoàn thành đạt yêu cầu (<strong>PASS</strong>) bài tập <strong>${escHtml(params.title)}</strong> ở lần chạy thử #${escHtml(params.runCount)}!</p>
-      <div style="margin:16px 0;padding:16px 18px;border-radius:12px;background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;">
-        <div style="font-size:18px;font-weight:800;color:#047857;">&#9989; PASS · ${escHtml(params.earnedPoints)}/${escHtml(params.totalPoints)} điểm (${escHtml(params.percentage)}%)</div>
-        <div style="margin-top:6px;font-size:13px;">Số tiêu chí đạt: <strong>${escHtml(params.passedCount)}/${escHtml(params.totalCount)}</strong></div>
+      <p style="margin-top:0;">Xin chào <strong style="color:${MAIL_NAVY};">${escHtml(params.studentName)}</strong>,</p>
+      <p>Chúc mừng bạn đã hoàn thành đạt yêu cầu (<strong style="color:#1d4ed8;">PASS</strong>) bài tập <strong>${escHtml(params.title)}</strong> ở lần chạy thử #${escHtml(params.runCount)}!</p>
+      <div style="margin:18px 0;padding:16px 18px;${MAIL_DOUBLE_BOX_BLUE}">
+        <div style="font-family:${MAIL_FONT_PLAYFUL};font-size:18px;font-weight:700;color:#1d4ed8;">&#9989; PASS · ${escHtml(params.earnedPoints)}/${escHtml(params.totalPoints)} điểm (${escHtml(params.percentage)}%)</div>
+        <div style="margin-top:6px;font-size:13.5px;color:${MAIL_NAVY};">Số tiêu chí đạt: <strong>${escHtml(params.passedCount)}/${escHtml(params.totalCount)}</strong></div>
       </div>
-      <p style="text-align:center;margin:20px 0 6px;"><a href="${escHtml(taskUrl)}" style="display:inline-block;padding:11px 24px;border-radius:10px;background:${THEMES.emerald.btnBg};color:#ffffff;text-decoration:none;font-weight:700;">Xem lại bài làm &rarr;</a></p>
+      <p style="text-align:center;margin:22px 0 6px;">${mailPrimaryButton(taskUrl, "Xem lại bài làm &rarr;")}</p>
     `;
     results.push(
       await sendEmailSafe({
@@ -527,13 +534,13 @@ export async function sendCodePassedNotificationEmails(params: {
 
   if (params.teacherEmail && params.teacherEmail.toLowerCase() !== params.studentEmail.toLowerCase()) {
     const bodyHtml = `
-      <p style="margin-top:0;">Xin chào <strong style="color:#0f172a;">${escHtml(params.teacherName)}</strong>,</p>
-      <p>Học viên <strong>${escHtml(params.studentName)}</strong> (${escHtml(params.studentEmail)}) vừa đạt <strong>PASS</strong> bài tập <strong>${escHtml(params.title)}</strong>:</p>
-      <div style="margin:16px 0;padding:16px 18px;border-radius:12px;background:#eff6ff;border:1px solid #bfdbfe;">
-        <div style="font-weight:800;color:#1d4ed8;">Kết quả lần Run #${escHtml(params.runCount)}: ${escHtml(params.earnedPoints)}/${escHtml(params.totalPoints)} điểm (${escHtml(params.percentage)}%)</div>
-        <div style="margin-top:6px;font-size:13px;color:#334155;">Tiêu chí đạt: <strong>${escHtml(params.passedCount)}/${escHtml(params.totalCount)}</strong></div>
+      <p style="margin-top:0;">Xin chào <strong style="color:${MAIL_NAVY};">${escHtml(params.teacherName)}</strong>,</p>
+      <p>Học viên <strong>${escHtml(params.studentName)}</strong> (<span style="color:#2563eb;">${escHtml(params.studentEmail)}</span>) vừa đạt <strong style="color:#1d4ed8;">PASS</strong> bài tập <strong>${escHtml(params.title)}</strong>:</p>
+      <div style="margin:18px 0;padding:16px 18px;${MAIL_DOUBLE_BOX_BLUE}">
+        <div style="font-family:${MAIL_FONT_PLAYFUL};font-weight:700;font-size:16px;color:#1d4ed8;">Kết quả lần Run #${escHtml(params.runCount)}: ${escHtml(params.earnedPoints)}/${escHtml(params.totalPoints)} điểm (${escHtml(params.percentage)}%)</div>
+        <div style="margin-top:6px;font-size:13.5px;color:${MAIL_NAVY};">Tiêu chí đạt: <strong>${escHtml(params.passedCount)}/${escHtml(params.totalCount)}</strong></div>
       </div>
-      <p style="text-align:center;margin:20px 0 6px;"><a href="${escHtml(taskUrl)}" style="display:inline-block;padding:11px 24px;border-radius:10px;background:${THEMES.blue.btnBg};color:#ffffff;text-decoration:none;font-weight:700;">Xem bài làm &amp; chấm điểm &rarr;</a></p>
+      <p style="text-align:center;margin:22px 0 6px;">${mailPrimaryButton(taskUrl, "Xem bài làm &amp; chấm điểm &rarr;")}</p>
     `;
     results.push(
       await sendEmailSafe({
@@ -572,19 +579,19 @@ export async function sendDeadlineWarningDigestEmail(params: {
       const kindBadge = t.taskKind === "code" ? "💻 Code" : "📝 ERD";
       const dueStr = formatVietnamDateTime(t.dueAt);
       const url = `${baseUrl}${prefix}/${encodeURIComponent(t.id)}`;
-      return `<li style="margin-bottom:10px;padding:12px 14px;border:1px solid #fde68a;border-left:4px solid #d97706;border-radius:10px;background:#fffdf5;">
+      return `<li style="margin-bottom:12px;padding:13px 15px;${MAIL_DOUBLE_BOX}">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
           <tr>
             <td>
-              <div style="font-size:14px;font-weight:800;color:#0f172a;">${idx + 1}. ${escHtml(t.title)}</div>
-              <div style="margin-top:6px;">
-                <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;margin-right:6px;">${kindBadge}</span>
-                <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:#fee2e2;color:#b91c1c;font-size:11px;font-weight:700;">&#9200; Hạn: ${escHtml(dueStr)}</span>
+              <div style="font-family:${MAIL_FONT_PLAYFUL};font-size:14.5px;font-weight:700;color:${MAIL_NAVY};">${idx + 1}. ${escHtml(t.title)}</div>
+              <div style="margin-top:7px;">
+                <span style="display:inline-block;padding:2px 9px;border-radius:8px;background:#dbeafe;border:1.5px solid ${MAIL_NAVY};color:#1e3a8a;font-size:11px;font-weight:700;margin-right:6px;">${kindBadge}</span>
+                <span style="display:inline-block;padding:2px 9px;border-radius:8px;background:#ffffff;border:1.5px solid #2563eb;color:#1d4ed8;font-size:11px;font-weight:700;">&#9200; Hạn: ${escHtml(dueStr)}</span>
               </div>
-              <div style="margin-top:4px;font-size:12px;color:#64748b;">Người giao: ${escHtml(t.assignerName)}</div>
+              <div style="margin-top:5px;font-size:12px;color:#3b5998;">Người giao: ${escHtml(t.assignerName)}</div>
             </td>
             <td align="right" style="vertical-align:middle;white-space:nowrap;padding-left:10px;">
-              <a href="${escHtml(url)}" style="display:inline-block;padding:7px 12px;border-radius:8px;background:#d97706;color:#ffffff;font-size:12px;font-weight:700;text-decoration:none;">Nộp ngay &rarr;</a>
+              ${mailMiniButton(url, "Nộp ngay &rarr;", true)}
             </td>
           </tr>
         </table>
@@ -593,9 +600,9 @@ export async function sendDeadlineWarningDigestEmail(params: {
     .join("");
 
   const bodyHtml = `
-    <p style="margin-top:0;">Xin chào <strong style="color:#0f172a;">${escHtml(params.toName)}</strong>,</p>
-    <div style="margin:12px 0 16px;padding:13px 16px;border-radius:12px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;">
-      <strong>&#9888;&#65039; Nhắc nhở sắp hết hạn:</strong> Bạn hiện còn <strong>${params.tasks.length}</strong> bài tập chưa hoàn thành và sắp đến hạn nộp. Hãy tranh thủ hoàn thành sớm để tránh trễ hạn nhé!
+    <p style="margin-top:0;">Xin chào <strong style="color:${MAIL_NAVY};">${escHtml(params.toName)}</strong>,</p>
+    <div style="margin:14px 0 18px;padding:14px 16px;${MAIL_DOUBLE_BOX_BLUE}color:${MAIL_NAVY};">
+      <strong style="color:#1d4ed8;">&#9888;&#65039; Nhắc nhở sắp hết hạn:</strong> Bạn hiện còn <strong style="color:#1d4ed8;">${params.tasks.length}</strong> bài tập chưa hoàn thành và sắp đến hạn nộp. Hãy tranh thủ hoàn thành sớm để tránh trễ hạn nhé!
     </div>
     <ul style="list-style:none;padding:0;margin:0 0 18px;">${listHtml}</ul>
   `;
@@ -645,9 +652,9 @@ export async function sendDailyInstructorSummaryEmail(params: {
   const subject = `[Tổng hợp cuối ngày ${params.dateLabel}] ${params.students.length} học viên đã làm bài (${params.totalActions} lượt)`;
 
   const badgeColors = {
-    green: { bg: "#dcfce7", text: "#166534" },
-    blue: { bg: "#dbeafe", text: "#1e40af" },
-    amber: { bg: "#fef3c7", text: "#92400e" },
+    green: { bg: "#dbeafe", text: "#1e3a8a", border: "#1d4ed8" },
+    blue: { bg: "#eff6ff", text: "#1d4ed8", border: "#2563eb" },
+    amber: { bg: "#ffffff", text: MAIL_NAVY, border: MAIL_NAVY },
   };
 
   const studentsHtml = params.students.length
@@ -658,15 +665,15 @@ export async function sendDailyInstructorSummaryEmail(params: {
               const prefix = it.taskKind === "code" ? "/code-tasks" : "/tasks";
               const link = `${baseUrl}${prefix}/${encodeURIComponent(it.taskId)}`;
               const col = badgeColors[it.statusColor];
-              return `<div style="padding:9px 11px;margin-top:8px;border-radius:8px;background:#ffffff;border:1px solid #e2e8f0;">
+              return `<div style="padding:9px 12px;margin-top:8px;border-radius:10px;background:#ffffff;border:2px solid ${MAIL_NAVY};">
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                   <tr>
                     <td>
-                      <a href="${escHtml(link)}" style="font-weight:700;color:#1e293b;text-decoration:none;">${it.taskKind === "code" ? "💻" : "📝"} ${escHtml(it.title)}</a>
-                      <div style="font-size:12px;color:#64748b;margin-top:2px;">${escHtml(it.detailText)}</div>
+                      <a href="${escHtml(link)}" style="font-weight:700;color:${MAIL_NAVY};text-decoration:none;">${it.taskKind === "code" ? "💻" : "📝"} ${escHtml(it.title)}</a>
+                      <div style="font-size:12px;color:#3b5998;margin-top:2px;">${escHtml(it.detailText)}</div>
                     </td>
                     <td align="right" style="vertical-align:top;white-space:nowrap;padding-left:8px;">
-                      <span style="display:inline-block;padding:3px 9px;border-radius:999px;background:${col.bg};color:${col.text};font-size:11px;font-weight:800;">${escHtml(it.statusBadge)}</span>
+                      <span style="display:inline-block;padding:3px 9px;border-radius:8px;background:${col.bg};border:1.5px solid ${col.border};color:${col.text};font-size:11px;font-weight:700;">${escHtml(it.statusBadge)}</span>
                     </td>
                   </tr>
                 </table>
@@ -674,40 +681,40 @@ export async function sendDailyInstructorSummaryEmail(params: {
             })
             .join("");
 
-          return `<div style="margin-bottom:14px;padding:14px 16px;border-radius:12px;background:#f8fafc;border:1px solid #cbd5e1;border-left:4px solid #4f46e5;">
-            <div style="font-size:14px;font-weight:800;color:#0f172a;">&#128100; ${escHtml(st.studentName)} <span style="font-weight:500;color:#64748b;font-size:12px;">(${escHtml(st.studentEmail)})</span></div>
+          return `<div style="margin-bottom:14px;padding:14px 16px;${MAIL_DOUBLE_BOX_BLUE}">
+            <div style="font-family:${MAIL_FONT_PLAYFUL};font-size:14.5px;font-weight:700;color:${MAIL_NAVY};">&#128100; ${escHtml(st.studentName)} <span style="font-family:${MAIL_FONT_BODY};font-weight:600;color:#2563eb;font-size:12px;">(${escHtml(st.studentEmail)})</span></div>
             ${itemsRows}
           </div>`;
         })
         .join("")
-    : `<div style="padding:16px;border-radius:12px;background:#f8fafc;border:1px dashed #cbd5e1;color:#64748b;text-align:center;">
+    : `<div style="padding:16px;${MAIL_DOUBLE_BOX}color:#3b5998;text-align:center;">
         Hôm nay chưa ghi nhận lượt làm/nộp bài mới nào từ học viên.
       </div>`;
 
   const bodyHtml = `
-    <p style="margin-top:0;">Xin chào <strong style="color:#0f172a;">${escHtml(params.toName)}</strong>,</p>
-    <p>Dưới đây là báo cáo tổng hợp hoạt động làm bài của các học viên trong ngày <strong>${escHtml(params.dateLabel)}</strong>:</p>
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:14px 0 18px;">
+    <p style="margin-top:0;">Xin chào <strong style="color:${MAIL_NAVY};">${escHtml(params.toName)}</strong>,</p>
+    <p>Dưới đây là báo cáo tổng hợp hoạt động làm bài của các học viên trong ngày <strong style="color:#1d4ed8;">${escHtml(params.dateLabel)}</strong>:</p>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:16px 0 20px;">
       <tr>
-        <td width="32%" style="padding:12px;border-radius:10px;background:#eef2ff;border:1px solid #c7d2fe;text-align:center;">
-          <div style="font-size:22px;font-weight:900;color:#4338ca;">${params.students.length}</div>
-          <div style="font-size:11px;font-weight:700;color:#4f46e5;margin-top:2px;">Học viên hoạt động</div>
+        <td width="32%" style="padding:12px;${MAIL_DOUBLE_BOX_BLUE}text-align:center;">
+          <div style="font-family:${MAIL_FONT_PLAYFUL};font-size:23px;font-weight:700;color:#1d4ed8;">${params.students.length}</div>
+          <div style="font-size:11px;font-weight:700;color:${MAIL_NAVY};margin-top:3px;">Học viên hoạt động</div>
         </td>
         <td width="2%">&nbsp;</td>
-        <td width="32%" style="padding:12px;border-radius:10px;background:#ecfdf5;border:1px solid #a7f3d0;text-align:center;">
-          <div style="font-size:22px;font-weight:900;color:#047857;">${params.totalPassedOrSubmitted}</div>
-          <div style="font-size:11px;font-weight:700;color:#059669;margin-top:2px;">Bài Pass / Đã nộp</div>
+        <td width="32%" style="padding:12px;${MAIL_DOUBLE_BOX}text-align:center;">
+          <div style="font-family:${MAIL_FONT_PLAYFUL};font-size:23px;font-weight:700;color:#2563eb;">${params.totalPassedOrSubmitted}</div>
+          <div style="font-size:11px;font-weight:700;color:${MAIL_NAVY};margin-top:3px;">Bài Pass / Đã nộp</div>
         </td>
         <td width="2%">&nbsp;</td>
-        <td width="32%" style="padding:12px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;text-align:center;">
-          <div style="font-size:22px;font-weight:900;color:#b45309;">${params.pendingTotal}</div>
-          <div style="font-size:11px;font-weight:700;color:#d97706;margin-top:2px;">Bài chưa xong</div>
+        <td width="32%" style="padding:12px;${MAIL_DOUBLE_BOX_BLUE}text-align:center;">
+          <div style="font-family:${MAIL_FONT_PLAYFUL};font-size:23px;font-weight:700;color:${MAIL_NAVY};">${params.pendingTotal}</div>
+          <div style="font-size:11px;font-weight:700;color:#1d4ed8;margin-top:3px;">Bài chưa xong</div>
         </td>
       </tr>
     </table>
     ${studentsHtml}
-    <p style="margin:20px 0 6px;text-align:center;">
-      <a href="${escHtml(baseUrl)}/code-tasks" style="display:inline-block;padding:11px 24px;border-radius:10px;background:${THEMES.violet.btnBg};color:#ffffff;text-decoration:none;font-weight:700;">Mở bảng quản lý kết quả &rarr;</a>
+    <p style="margin:22px 0 6px;text-align:center;">
+      ${mailPrimaryButton(`${baseUrl}/code-tasks`, "Mở bảng quản lý kết quả &rarr;")}
     </p>
   `;
 

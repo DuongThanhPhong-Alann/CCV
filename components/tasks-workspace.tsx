@@ -8,6 +8,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import AccountAvatarButton from "@/components/account-avatar-button";
 import BatchDraftAssignBar from "@/components/batch-draft-assign-bar";
 import BoxesLoader from "@/components/boxes-loader";
+import GradientProgressBar from "@/components/gradient-progress-bar";
 import IosCheckbox from "@/components/ios-checkbox";
 import MailActionsBar from "@/components/mail-actions-bar";
 import TaskPedestalIcon, { type PedestalTone } from "@/components/task-pedestal-icon";
@@ -55,12 +56,23 @@ function getAssigneeKey(task: {
   return "unassigned";
 }
 
+function isTaskOverdue(dueAt?: string | null): boolean {
+  if (!dueAt) return false;
+  const ms = new Date(dueAt).getTime();
+  return Number.isFinite(ms) && ms < Date.now();
+}
+
+function isErdTaskOverdueUnfinished(task: AssignmentTask): boolean {
+  if (task.status === "draft" || task.status === "declined") return false;
+  if (task.submission) return false;
+  return isTaskOverdue(task.dueAt);
+}
+
 function erdTaskPedestalTone(task: AssignmentTask): PedestalTone {
   if (task.status === "draft") return "slate";
   if (task.submission && task.grade?.submissionVersion === task.submission.version) return "green";
   if (task.status === "declined") return "red";
-  const isOverdue = Boolean(task.dueAt && new Date(task.dueAt).getTime() < Date.now());
-  if (isOverdue && !task.submission) return "red";
+  if (isErdTaskOverdueUnfinished(task)) return "red";
   if (task.status === "invited") return "gold";
   return "blue";
 }
@@ -68,11 +80,16 @@ function erdTaskPedestalTone(task: AssignmentTask): PedestalTone {
 function taskState(task: AssignmentTask, scope: TaskScope) {
   if (task.status === "draft") return { label: "Trong kho", tone: "draft" };
   if (task.status === "declined") return { label: "Đã từ chối", tone: "declined" };
+  if (task.submission && task.grade?.submissionVersion === task.submission.version) return { label: "Đã chấm điểm", tone: "graded" };
+  if (task.submission) return { label: "Đã nộp bài", tone: "submitted" };
+  if (isErdTaskOverdueUnfinished(task)) {
+    return task.status === "invited"
+      ? { label: "Quá hạn · Chưa nhận", tone: "overdue" }
+      : { label: "Quá hạn · Chưa nộp", tone: "overdue" };
+  }
   if (task.status === "invited") return scope === "received"
     ? { label: "Chờ bạn phản hồi", tone: "waiting" }
     : { label: "Đang chờ chấp nhận", tone: "waiting" };
-  if (task.submission && task.grade?.submissionVersion === task.submission.version) return { label: "Đã chấm điểm", tone: "graded" };
-  if (task.submission) return { label: "Đã nộp bài", tone: "submitted" };
   return { label: "Đang thực hiện", tone: "active" };
 }
 
@@ -406,12 +423,11 @@ export default function TasksWorkspace() {
                   <span className="assignee-stat-declined">✕ {selectedAssignee.declinedCount} từ chối</span>
                 )}
               </div>
-              <div className="code-mini-bar-track" aria-hidden="true">
-                <div
-                  className={`code-mini-bar-fill ${selectedAssignee.submittedCount === selectedAssignee.totalCount && selectedAssignee.totalCount > 0 ? "is-pass" : "is-fail"}`}
-                  style={{ width: `${selectedAssignee.completionRate}%` }}
-                />
-              </div>
+              <GradientProgressBar
+                percentage={selectedAssignee.completionRate}
+                size="sm"
+                ariaLabel={`Tỉ lệ nộp bài ${selectedAssignee.completionRate}%`}
+              />
             </div>
           </div>
         </section>
@@ -511,12 +527,11 @@ export default function TasksWorkspace() {
                             🕒 Cập nhật gần nhất: {formatDate(group.latestActivityAt)}
                           </span>
                         </div>
-                        <div className="code-mini-bar-track" aria-hidden="true">
-                          <div
-                            className={`code-mini-bar-fill ${group.submittedCount === group.totalCount && group.totalCount > 0 ? "is-pass" : "is-fail"}`}
-                            style={{ width: `${group.completionRate}%` }}
-                          />
-                        </div>
+                        <GradientProgressBar
+                          percentage={group.completionRate}
+                          size="sm"
+                          ariaLabel={`Tỉ lệ nộp bài ${group.completionRate}%`}
+                        />
                       </div>
                       <span className="task-list-arrow">›</span>
                     </button>
@@ -579,7 +594,9 @@ export default function TasksWorkspace() {
                   <div className="task-card-meta-row">
                     <span className="task-list-date">🕒 Cập nhật: {formatDate(task.updatedAt)}</span>
                     {task.dueAt && (
-                      <span className="due-pill">⏰ Hạn: {formatDate(task.dueAt)}</span>
+                      <span className={`due-pill ${isErdTaskOverdueUnfinished(task) ? "is-overdue" : ""}`}>
+                        {isErdTaskOverdueUnfinished(task) ? "⚠️ Quá hạn:" : "⏰ Hạn:"} {formatDate(task.dueAt)}
+                      </span>
                     )}
                     {task.submission && (
                       <span className="task-sub-count">📄 Bản nộp v{task.submission.version}</span>

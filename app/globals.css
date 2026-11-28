@@ -47,8 +47,8 @@ button { color: inherit; }
 .topbar { height: 70px; flex: 0 0 70px; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #17233a; background: #020611; z-index: 10; }
 .brand-lockup, .topbar-right, .breadcrumb, .project-meta, .project-actions, .tool-button, .zoom-control, .save-state, .avatar-stack { display: flex; align-items: center; }
 .brand-lockup { gap: 11px; }
-.brand-logo-frame { position: relative; width: 102px; height: 68px; flex: 0 0 102px; overflow: hidden; }
-.brand-logo { position: absolute; top: calc(50% + 5px); left: 50%; display: block; width: 144px; height: 96px; max-width: none; transform: translate(-50%, -50%); }
+.brand-logo-frame { position: relative; width: 58px; height: 58px; flex: 0 0 58px; display: flex; align-items: center; justify-content: center; }
+.brand-logo { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.35)); }
 .brand-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; color: #fff; background: #2563eb; box-shadow: 0 3px 8px rgba(37,99,235,.4); }
 .brand-name { color: #1a2c43; font: 800 16px/1 'Manrope', sans-serif; letter-spacing: -.65px; }
 .brand-name span { color: #60a5fa; }
@@ -257,8 +257,8 @@ button { color: inherit; }
 .editor-loading h1 { margin: 12px 0 0; color: #1e3a5f; font: 700 19px 'Manrope', sans-serif; }
 .editor-loading p, .dashboard-loading p { margin: 0; font-size: 13px; font-weight: 500; }
 .editor-loading a { margin-top: 6px; color: #2563eb; font-size: 12px; text-decoration: none; }
-.loading-brand { width: 102px; height: 68px; overflow: hidden; background: #020611; }
-.loading-brand img { width: 144px; height: 96px; max-width: none; transform: translate(-21px, -12px); }
+.loading-brand { width: 76px; height: 76px; display: grid; place-items: center; }
+.loading-brand img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 4px 12px rgba(37, 99, 235, 0.32)); }
 .loading-spinner { width: 22px; height: 22px; border: 2.5px solid #dbeafe; border-top-color: #2563eb; border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -449,8 +449,9 @@ button { color: inherit; }
 .dashboard-page { min-height: 100dvh; color: var(--ink); background: var(--canvas); }
 
 .dashboard-topbar { height: 70px; display: flex; align-items: center; justify-content: space-between; padding: 0 max(28px, calc((100vw - 1200px) / 2)); border-bottom: 1px solid #17233a; background: #020611; }
-.dashboard-brand { position: relative; width: 102px; height: 68px; display: block; overflow: hidden; }
-.dashboard-brand img { position: absolute; top: calc(50% + 5px); left: 50%; width: 144px; height: 96px; max-width: none; transform: translate(-50%, -50%); }
+.dashboard-brand { position: relative; width: 58px; height: 58px; flex: 0 0 58px; display: flex; align-items: center; justify-content: center; transition: transform 0.16s ease; }
+.dashboard-brand:hover { transform: scale(1.06); }
+.dashboard-brand img { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.38)); }
 
 .dashboard-user { display: flex; align-items: center; gap: 10px; color: #fff; }
 .user-avatar { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; color: #fff; font-size: 13px; font-weight: 700; background: #2563eb; border: 2px solid rgba(255,255,255,.2); }
@@ -588,8 +589,8 @@ button { color: inherit; }
 @media (max-width: 760px) {
   .topbar { height: 56px; flex-basis: 56px; padding: 0 14px; }
   .brand-lockup { gap: 8px; }
-  .brand-logo-frame { width: 84px; height: 56px; flex-basis: 84px; }
-  .brand-logo { width: 118px; height: 79px; top: calc(50% + 4px); }
+  .brand-logo-frame, .dashboard-brand { width: 46px; height: 46px; flex-basis: 46px; }
+  .brand-logo, .dashboard-brand img { width: 100%; height: 100%; }
   .breadcrumb, .brand-divider, .save-state, .topbar-separator, .avatar-stack, .tool-button kbd, .project-subtitle { display: none; }
   .topbar-right { gap: 8px; }
   .share-button { width: 34px; padding: 0; font-size: 0; }
@@ -685,7 +686,8 @@ button { color: inherit; }
 .task-card-active { border-left: 4.5px solid #2563eb; }
 .task-card-submitted { border-left: 4.5px solid #7c3aed; }
 .task-card-graded { border-left: 4.5px solid #10b981; }
-.task-card-declined { border-left: 4.5px solid #ef4444; }
+.task-card-declined,
+.task-card-overdue { border-left: 4.5px solid #ef4444; }
 .task-card-draft { border-left: 4.5px solid #94a3b8; }
 
 .task-list-icon { width: 42px; height: 42px; flex: 0 0 42px; display: grid; place-items: center; border-radius: 10px; font-size: 20px; }
@@ -717,7 +719,8 @@ button { color: inherit; }
 .task-state-active { border-color: #bfdbfe; color: #1d4ed8; background: #eff6ff; }
 .task-state-submitted { border-color: #c4b5fd; color: #6d28d9; background: #f5f3ff; }
 .task-state-graded { border-color: #a7f3d0; color: #047857; background: #ecfdf5; }
-.task-state-declined { border-color: #fca5a5; color: #b91c1c; background: #fff1f2; }
+.task-state-declined,
+.task-state-overdue { border-color: #fca5a5; color: #b91c1c; background: #fff1f2; }
 
 /* Empty state */
 .tasks-empty { min-height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 24px; border: 2px dashed #cbd5e1; border-radius: 14px; background: #fff; text-align: center; }
@@ -1440,6 +1443,7 @@ html[data-theme="dark"] .cluster-3d-base {
 /* ─── Due Date & Mail Digest Controls ────────────────────── */
 .task-detail-dates-col { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .due-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 99px; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; font-size: 11px; font-weight: 700; }
+.due-pill.is-overdue { background: #fff1f2; border-color: #fca5a5; color: #b91c1c; }
 .due-date-box { margin-top: 14px; padding: 12px 14px; border: 1.5px solid #e2e8f0; border-radius: 10px; background: #f8fafc; display: flex; flex-direction: column; gap: 8px; }
 .due-date-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .due-date-row label { font-size: 11.5px; font-weight: 800; color: #1e293b; }
@@ -1855,7 +1859,8 @@ html[data-theme="dark"] .task-state-draft { border-color: #334155; color: #cbd5e
 html[data-theme="dark"] .task-state-active { border-color: rgba(96, 165, 250, 0.4); color: #93c5fd; background: rgba(37, 99, 235, 0.2); }
 html[data-theme="dark"] .task-state-submitted { border-color: rgba(167, 139, 250, 0.42); color: #d8b4fe; background: rgba(124, 58, 237, 0.22); }
 html[data-theme="dark"] .task-state-graded { border-color: rgba(52, 211, 153, 0.4); color: #6ee7b7; background: rgba(16, 185, 129, 0.18); }
-html[data-theme="dark"] .task-state-declined { border-color: rgba(248, 113, 113, 0.4); color: #fca5a5; background: rgba(239, 68, 68, 0.18); }
+html[data-theme="dark"] .task-state-declined,
+html[data-theme="dark"] .task-state-overdue { border-color: rgba(248, 113, 113, 0.4); color: #fca5a5; background: rgba(239, 68, 68, 0.18); }
 
 html[data-theme="dark"] .task-sub-count { border-color: rgba(167, 139, 250, 0.38); color: #d8b4fe; background: rgba(124, 58, 237, 0.2); }
 html[data-theme="dark"] .task-grade-pill { border-color: rgba(52, 211, 153, 0.38); color: #6ee7b7; background: rgba(16, 185, 129, 0.18); }
@@ -1864,6 +1869,7 @@ html[data-theme="dark"] .code-progress-pill.is-fail { border-color: rgba(251, 19
 html[data-theme="dark"] .code-mini-bar-track,
 html[data-theme="dark"] .code-progress-bar-track { background: #1e293b; }
 html[data-theme="dark"] .due-pill { background: rgba(245, 158, 11, 0.16); border-color: rgba(251, 191, 36, 0.38); color: #fcd34d; }
+html[data-theme="dark"] .due-pill.is-overdue { background: rgba(239, 68, 68, 0.18); border-color: rgba(248, 113, 113, 0.45); color: #fca5a5; }
 
 html[data-theme="dark"] .tasks-empty { border-color: #2a3a54; background: #111a2d; }
 html[data-theme="dark"] .tasks-empty-icon { border-color: rgba(96, 165, 250, 0.38); color: #93c5fd; background: rgba(37, 99, 235, 0.18); }
@@ -2282,6 +2288,65 @@ html[data-theme="dark"] .auth-timeout-notice {
 .activity-content { width: min(1100px, calc(100% - 48px)); }
 .activity-head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .activity-updated-tag { color: #64748b; font-size: 11px; font-weight: 600; }
+
+.activity-realtime-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 13px;
+  border-radius: 99px;
+  border: 2px solid #047857;
+  background: #ecfdf5;
+  color: #065f46;
+  box-shadow: 2px 2px 0 #047857;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+
+.activity-realtime-pill.is-connecting,
+.activity-realtime-pill.is-reconnecting {
+  border-color: #b45309;
+  background: #fffbeb;
+  color: #92400e;
+  box-shadow: 2px 2px 0 #b45309;
+}
+
+.activity-realtime-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: activityLivePulse 1.6s ease-out infinite;
+}
+
+.activity-realtime-pill.is-connecting .activity-realtime-dot,
+.activity-realtime-pill.is-reconnecting .activity-realtime-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+}
+
+@keyframes activityLivePulse {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.65); }
+  70% { box-shadow: 0 0 0 7px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+html[data-theme="dark"] .activity-realtime-pill {
+  border-color: #34d399;
+  background: rgba(16, 185, 129, 0.16);
+  color: #6ee7b7;
+  box-shadow: 2px 2px 0 #34d399;
+}
+
+html[data-theme="dark"] .activity-realtime-pill.is-connecting,
+html[data-theme="dark"] .activity-realtime-pill.is-reconnecting {
+  border-color: #fbbf24;
+  background: rgba(245, 158, 11, 0.16);
+  color: #fde68a;
+  box-shadow: 2px 2px 0 #fbbf24;
+}
 
 .activity-kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
 .activity-kpi-card { display: flex; flex-direction: column; gap: 4px; padding: 15px 18px; border: 1.5px solid #e2e8f0; border-radius: 12px; background: #fff; box-shadow: var(--s0); }
@@ -3121,7 +3186,7 @@ html[data-theme="dark"] .run-cloud-caption {
 }
 
 
-/* ─── Top Navigation Entry Buttons (Uiverse.io by himanshu9682) */
+/* ─── Top Navigation Neo-Brutalist Buttons (matches Được giao / Kho đề levxyca style) */
 .topnav-glass-wrap {
   display: flex;
   align-items: center;
@@ -3132,352 +3197,150 @@ html[data-theme="dark"] .run-cloud-caption {
 .topnav-entry-group {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
 }
 
 .topnav-entry-btn {
-  --line_color: #60a5fa;
-  --back_color: #172f66;
-  --glow_color: rgba(59, 130, 246, 0.35);
+  --nav-bg: #0d1b36;
+  --nav-bg-hover: #172f66;
+  --nav-bg-active: #2563eb;
+  --nav-text: #93c5fd;
+  --nav-edge: #60a5fa;
+  --nav-edge-hover: #93c5fd;
+  --nav-edge-active: #bfdbfe;
 
-  position: relative;
-  z-index: 0;
-  isolation: isolate;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   height: 36px;
+  padding: 0 13px;
   flex: 0 0 auto;
-  text-decoration: none;
+  border: 2px solid var(--nav-edge);
+  border-radius: 10px;
+  background: var(--nav-bg);
+  color: var(--nav-text);
+  box-shadow: 3px 3px 0 var(--nav-edge);
   font-size: 11px;
   font-weight: 700;
-  color: var(--line_color);
-  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  letter-spacing: 0.35px;
+  text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
-  transition: color 0.3s ease, letter-spacing 0.3s ease, filter 0.3s ease;
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.08s ease,
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
 }
 
-/* Fixed comfortable widths so hover letter-spacing never shifts neighbors */
-.topnav-entry-btn.nav-key-diagrams { width: 146px; }
-.topnav-entry-btn.nav-key-tasks { width: 114px; }
-.topnav-entry-btn.nav-key-code-tasks { width: 142px; }
-.topnav-entry-btn.nav-key-closure { width: 146px; }
-.topnav-entry-btn.nav-key-activity { width: 126px; }
-
-/* 5 preserved button colors */
 /* 1. Xanh dương — Sơ đồ của tôi */
 .topnav-entry-btn.tone-blue {
-  --line_color: #60a5fa;
-  --back_color: #172f66;
-  --glow_color: rgba(59, 130, 246, 0.45);
+  --nav-bg: #0d1b36;
+  --nav-bg-hover: #172f66;
+  --nav-bg-active: #2563eb;
+  --nav-text: #93c5fd;
+  --nav-edge: #60a5fa;
+  --nav-edge-hover: #93c5fd;
+  --nav-edge-active: #bfdbfe;
 }
 
 /* 2. Xanh lá ánh xanh dương — Bài tập */
 .topnav-entry-btn.tone-teal {
-  --line_color: #2dd4bf;
-  --back_color: #0e4a47;
-  --glow_color: rgba(20, 184, 166, 0.45);
+  --nav-bg: #08272a;
+  --nav-bg-hover: #0e4a47;
+  --nav-bg-active: #0d9488;
+  --nav-text: #5eead4;
+  --nav-edge: #2dd4bf;
+  --nav-edge-hover: #5eead4;
+  --nav-edge-active: #99f6e4;
 }
 
 /* 3. Vàng — Code bài tập */
 .topnav-entry-btn.tone-gold {
-  --line_color: #facc15;
-  --back_color: #544006;
-  --glow_color: rgba(234, 179, 8, 0.45);
+  --nav-bg: #261d06;
+  --nav-bg-hover: #4a3708;
+  --nav-bg-active: #ca8a04;
+  --nav-text: #fde047;
+  --nav-edge: #facc15;
+  --nav-edge-hover: #fef08a;
+  --nav-edge-active: #fef08a;
 }
 
 /* 4. Cam — Tìm siêu khóa */
 .topnav-entry-btn.tone-orange {
-  --line_color: #fb923c;
-  --back_color: #632809;
-  --glow_color: rgba(249, 115, 22, 0.45);
+  --nav-bg: #2c1306;
+  --nav-bg-hover: #57230a;
+  --nav-bg-active: #ea580c;
+  --nav-text: #fdba74;
+  --nav-edge: #fb923c;
+  --nav-edge-hover: #fed7aa;
+  --nav-edge-active: #fed7aa;
 }
 
 /* 5. Đỏ đô — Hoạt động */
 .topnav-entry-btn.tone-burgundy {
-  --line_color: #f43f5e;
-  --back_color: #5e0d25;
-  --glow_color: rgba(190, 18, 60, 0.5);
-}
-
-.topnav-entry-text {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 5px;
-  width: 100%;
-  height: 100%;
-  position: relative;
-  z-index: 2;
-}
-
-.topnav-entry-btn::before,
-.topnav-entry-btn::after,
-.topnav-entry-text::before,
-.topnav-entry-text::after {
-  content: "";
-  position: absolute;
-  height: 2.5px;
-  border-radius: 2px;
-  background: var(--line_color);
-  transition: width 0.5s ease;
-  pointer-events: none;
-}
-
-.topnav-entry-btn::before {
-  top: 0;
-  left: 24px;
-  width: calc(100% - 26px * 2 - 12px);
-}
-
-.topnav-entry-btn::after {
-  top: 0;
-  right: 24px;
-  width: 6px;
-}
-
-.topnav-entry-text::before {
-  bottom: 0;
-  right: 24px;
-  width: calc(100% - 26px * 2 - 12px);
-}
-
-.topnav-entry-text::after {
-  bottom: 0;
-  left: 24px;
-  width: 6px;
-}
-
-.topnav-entry-line {
-  position: absolute;
-  top: 0;
-  width: 26px;
-  height: 100%;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.topnav-entry-line::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  width: calc(100% + 20px);
-  height: 100%;
-  box-sizing: border-box;
-  border-radius: 300px;
-  border: solid 2.5px var(--line_color);
-}
-
-.topnav-entry-line:nth-child(1),
-.topnav-entry-line:nth-child(1)::before {
-  left: 0;
-}
-
-.topnav-entry-line:nth-child(2),
-.topnav-entry-line:nth-child(2)::before {
-  right: 0;
-}
-
-.topnav-entry-btn:hover,
-.topnav-entry-btn.active {
-  color: #ffffff;
-  letter-spacing: 1.25px;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
-  filter: drop-shadow(0 0 8px var(--glow_color));
-}
-
-.topnav-entry-btn.active {
-  z-index: 1;
+  --nav-bg: #2b0915;
+  --nav-bg-hover: #5e0d25;
+  --nav-bg-active: #9f1239;
+  --nav-text: #fda4af;
+  --nav-edge: #f43f5e;
+  --nav-edge-hover: #fda4af;
+  --nav-edge-active: #fecdd3;
 }
 
 .topnav-entry-btn:hover {
-  z-index: 2;
+  background: var(--nav-bg-hover);
+  color: #ffffff;
+  border-color: var(--nav-edge-hover);
+  box-shadow: 3px 3px 0 var(--nav-edge-hover);
 }
 
-.topnav-entry-btn:hover::before,
-.topnav-entry-btn:hover .topnav-entry-text::before,
-.topnav-entry-btn.active::before,
-.topnav-entry-btn.active .topnav-entry-text::before {
-  width: 6px;
+.topnav-entry-btn.active {
+  background: var(--nav-bg-active);
+  color: #ffffff;
+  border-color: var(--nav-edge-active);
+  box-shadow: 3px 3px 0 var(--nav-edge-active);
 }
 
-.topnav-entry-btn:hover::after,
-.topnav-entry-btn:hover .topnav-entry-text::after,
-.topnav-entry-btn.active::after,
-.topnav-entry-btn.active .topnav-entry-text::after {
-  width: calc(100% - 26px * 2 - 12px);
-}
-
-.topnav-entry-drow1,
-.topnav-entry-drow2 {
-  position: absolute;
-  z-index: -1;
-  border-radius: 10px;
-  transform-origin: 10px 10px;
-  pointer-events: none;
-}
-
-.topnav-entry-drow1 {
-  top: -9px;
-  left: 18%;
-  width: 20px;
-  height: 0;
-  transform: rotate(30deg);
-}
-
-.topnav-entry-drow2 {
-  top: 26px;
-  left: 36%;
-  width: 20px;
-  height: 0;
-  transform: rotate(-127deg);
-}
-
-.topnav-entry-drow1::before,
-.topnav-entry-drow1::after,
-.topnav-entry-drow2::before,
-.topnav-entry-drow2::after {
-  content: "";
-  position: absolute;
-}
-
-.topnav-entry-drow1::before {
-  bottom: 0;
-  left: 0;
-  width: 0;
-  height: 20px;
-  border-radius: 10px;
-  transform-origin: 10px 10px;
-  transform: rotate(-60deg);
-}
-
-.topnav-entry-drow1::after {
-  top: -6px;
-  left: 26px;
-  width: 0;
-  height: 20px;
-  border-radius: 10px;
-  transform-origin: 10px 10px;
-  transform: rotate(69deg);
-}
-
-.topnav-entry-drow2::before {
-  bottom: 0;
-  left: 0;
-  width: 0;
-  height: 20px;
-  border-radius: 10px;
-  transform-origin: 10px 10px;
-  transform: rotate(-146deg);
-}
-
-.topnav-entry-drow2::after {
-  bottom: 15px;
-  left: -24px;
-  width: 0;
-  height: 20px;
-  border-radius: 10px;
-  transform-origin: 10px 10px;
-  transform: rotate(-262deg);
-}
-
-.topnav-entry-drow1,
-.topnav-entry-drow1::before,
-.topnav-entry-drow1::after,
-.topnav-entry-drow2,
-.topnav-entry-drow2::before,
-.topnav-entry-drow2::after {
-  background: var(--back_color);
-}
-
-.topnav-entry-btn:hover .topnav-entry-drow1,
-.topnav-entry-btn.active .topnav-entry-drow1 {
-  animation: navEntryDrow1 ease-in 0.06s forwards;
-}
-
-.topnav-entry-btn:hover .topnav-entry-drow1::before,
-.topnav-entry-btn.active .topnav-entry-drow1::before {
-  animation: navEntryDrow2 linear 0.08s 0.06s forwards;
-}
-
-.topnav-entry-btn:hover .topnav-entry-drow1::after,
-.topnav-entry-btn.active .topnav-entry-drow1::after {
-  animation: navEntryDrow3 linear 0.03s 0.14s forwards;
-}
-
-.topnav-entry-btn:hover .topnav-entry-drow2,
-.topnav-entry-btn.active .topnav-entry-drow2 {
-  animation: navEntryDrow4 linear 0.06s 0.2s forwards;
-}
-
-.topnav-entry-btn:hover .topnav-entry-drow2::before,
-.topnav-entry-btn.active .topnav-entry-drow2::before {
-  animation: navEntryDrow3 linear 0.03s 0.26s forwards;
-}
-
-.topnav-entry-btn:hover .topnav-entry-drow2::after,
-.topnav-entry-btn.active .topnav-entry-drow2::after {
-  animation: navEntryDrow5 linear 0.06s 0.32s forwards;
-}
-
-@keyframes navEntryDrow1 {
-  0% { height: 0; }
-  100% { height: 56px; }
-}
-
-@keyframes navEntryDrow2 {
-  0% { width: 0; opacity: 0; }
-  10% { opacity: 0; }
-  11% { opacity: 1; }
-  100% { width: 70px; }
-}
-
-@keyframes navEntryDrow3 {
-  0% { width: 0; }
-  100% { width: 46px; }
-}
-
-@keyframes navEntryDrow4 {
-  0% { height: 0; }
-  100% { height: 68px; }
-}
-
-@keyframes navEntryDrow5 {
-  0% { width: 0; }
-  100% { width: 72px; }
+.topnav-entry-btn:active {
+  box-shadow: none;
+  transform: translate(3px, 3px);
 }
 
 @media (max-width: 1180px) {
   .topnav-entry-group { gap: 8px; }
-  .topnav-entry-btn { height: 34px; font-size: 10.5px; }
-  .topnav-entry-btn.nav-key-diagrams { width: 132px; }
-  .topnav-entry-btn.nav-key-tasks { width: 104px; }
-  .topnav-entry-btn.nav-key-code-tasks { width: 130px; }
-  .topnav-entry-btn.nav-key-closure { width: 134px; }
-  .topnav-entry-btn.nav-key-activity { width: 116px; }
-  .topnav-entry-btn:hover,
-  .topnav-entry-btn.active { letter-spacing: 0.9px; }
+  .topnav-entry-btn {
+    height: 33px;
+    padding: 0 10px;
+    font-size: 10px;
+    border-radius: 8px;
+    box-shadow: 2px 2px 0 var(--nav-edge);
+  }
+  .topnav-entry-btn:hover { box-shadow: 2px 2px 0 var(--nav-edge-hover); }
+  .topnav-entry-btn.active { box-shadow: 2px 2px 0 var(--nav-edge-active); }
+  .topnav-entry-btn:active {
+    box-shadow: none;
+    transform: translate(2px, 2px);
+  }
 }
 
 @media (max-width: 760px) {
   .topnav-entry-group {
-    gap: 8px;
+    gap: 7px;
     overflow-x: auto;
-    overflow-y: visible;
-    padding: 12px 4px;
+    padding: 4px 4px 6px 0;
     scrollbar-width: none;
   }
   .topnav-entry-group::-webkit-scrollbar { display: none; }
-  .topnav-entry-btn { height: 32px; font-size: 10px; }
-  .topnav-entry-btn.nav-key-diagrams { width: 124px; }
-  .topnav-entry-btn.nav-key-tasks { width: 98px; }
-  .topnav-entry-btn.nav-key-code-tasks { width: 122px; }
-  .topnav-entry-btn.nav-key-closure { width: 124px; }
-  .topnav-entry-btn.nav-key-activity { width: 108px; }
-  .topnav-entry-btn:hover,
-  .topnav-entry-btn.active { letter-spacing: 0.6px; }
+  .topnav-entry-btn {
+    height: 31px;
+    padding: 0 9px;
+    font-size: 9.5px;
+  }
 }
 
 
@@ -3583,4 +3446,996 @@ html[data-theme="dark"] .run-cloud-caption {
 @media (max-width: 760px) {
   .task-pedestal-wrap { width: 44px; height: 44px; flex-basis: 44px; border-radius: 10px; }
   .task-pedestal-svg { width: 40px; height: 40px; }
+}
+
+
+/* ─── Untouched Buttons — Neo-Brutalist Style (Uiverse.io by levxyca)
+   Applies ONLY to buttons not previously restyled; preserves each button's original color palette.
+   Excluded (already customized): .topnav-entry-btn, .cluster-3d-btn, .code-kbd-btn,
+   .user-avatar-btn, .avatar-option-btn, .theme-switch-label, .ios-checkbox, .criterion-check-3d. */
+
+.create-diagram-button,
+.auth-submit,
+.primary-button,
+.share-button,
+.code-run-button,
+.submit-task-button,
+.dashboard-user > button:not(.user-avatar-btn),
+.logout-button,
+.task-editor-link,
+.code-secondary-button,
+.cancel-create,
+.copy-button,
+.task-decline-button,
+.task-back-link,
+.task-tabs button,
+.export-tabs button,
+.code-subtabs button,
+.tool-button,
+.fit-control,
+.task-prompt-panel header button,
+.closure-btn,
+.closure-step-helper,
+.closure-add-row-btn,
+.closure-row-delete,
+.closure-mini-chip,
+.closure-eq-toggle,
+.superkey-add-cell,
+.cluster-tab-pill,
+.cluster-select-btn,
+.picker-chip-btn {
+  --neo-shift: 3px;
+  --neo-edge: #334155;
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--neo-edge);
+  border-radius: 10px;
+  box-shadow: var(--neo-shift) var(--neo-shift) 0 var(--neo-edge);
+  text-transform: uppercase;
+  letter-spacing: 0.35px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.08s ease,
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+/* Compact buttons use proportional 2px offset & 8px radius */
+.dashboard-user > button:not(.user-avatar-btn),
+.logout-button,
+.task-editor-link,
+.tool-button,
+.fit-control,
+.task-prompt-panel header button,
+.closure-row-delete,
+.closure-mini-chip,
+.closure-eq-toggle,
+.cluster-select-btn,
+.picker-chip-btn {
+  --neo-shift: 2px;
+  border-radius: 8px;
+}
+
+/* Keep math expressions & symbols case-sensitive */
+.closure-mini-chip,
+.closure-eq-toggle {
+  text-transform: none;
+  letter-spacing: 0.1px;
+}
+
+/* Container spacing so offset shadows never clip or collide */
+.task-tabs {
+  gap: 10px;
+  padding-bottom: 14px;
+}
+.task-tabs button {
+  padding: 9px 15px;
+}
+.task-tabs button.active::after {
+  display: none;
+}
+
+.export-tabs {
+  gap: 10px;
+  padding: 15px 24px 12px;
+}
+.export-tabs button.active::after {
+  display: none;
+}
+
+.code-subtabs {
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+html[data-theme="dark"] .code-subtabs {
+  border: 0;
+  background: transparent;
+}
+
+.project-actions {
+  gap: 8px;
+}
+
+.dashboard-user > button:not(.user-avatar-btn) {
+  height: 32px;
+  padding: 0 11px;
+  font-size: 10px;
+}
+
+/* ── Original Color Preservation (Light Mode) ── */
+
+/* 1. Primary Blue solid buttons (#2563eb + white text) */
+.create-diagram-button,
+.auth-submit,
+.primary-button,
+.share-button,
+.code-run-button,
+.closure-btn-primary,
+.closure-btn.active,
+.cluster-tab-pill.active,
+.cluster-select-btn.is-selected,
+.picker-chip-btn.is-active-chip,
+.code-subtabs button.active {
+  --neo-edge: #1e3a8a;
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.create-diagram-button:hover:not(:disabled),
+.auth-submit:hover:not(:disabled),
+.primary-button:hover:not(:disabled),
+.share-button:hover:not(:disabled),
+.code-run-button:hover:not(:disabled),
+.closure-btn-primary:hover:not(:disabled),
+.closure-btn.active:hover:not(:disabled),
+.cluster-tab-pill.active:hover:not(:disabled),
+.cluster-select-btn.is-selected:hover:not(:disabled),
+.picker-chip-btn.is-active-chip:hover:not(:disabled),
+.code-subtabs button.active:hover:not(:disabled) {
+  --neo-edge: #172554;
+  background: #1d4ed8;
+  color: #ffffff;
+}
+
+/* Share button inside always-dark ERD topbar */
+.topbar .share-button {
+  --neo-edge: #93c5fd;
+}
+.topbar .share-button:hover:not(:disabled) {
+  --neo-edge: #dbeafe;
+}
+
+/* 2. Green solid button (Submit task on always-dark ERD topbar) */
+.submit-task-button {
+  --neo-edge: #86efac;
+  background: #15803d;
+  color: #ffffff;
+}
+.submit-task-button:hover:not(:disabled) {
+  --neo-edge: #bbf7d0;
+  background: #166534;
+  color: #ffffff;
+}
+
+/* 3. Always-dark Topbar neutral buttons (Đăng xuất, Bài tập) */
+.dashboard-user > button:not(.user-avatar-btn),
+.logout-button,
+.task-editor-link {
+  --neo-edge: #94a3b8;
+  background: #111a2d;
+  color: #e2e8f0;
+}
+.dashboard-user > button:not(.user-avatar-btn):hover:not(:disabled),
+.logout-button:hover:not(:disabled),
+.task-editor-link:hover:not(:disabled) {
+  --neo-edge: #f8fafc;
+  background: #1b2842;
+  color: #ffffff;
+}
+
+/* 4. Secondary White / Slate buttons */
+.code-secondary-button,
+.cancel-create,
+.copy-button,
+.closure-btn,
+.task-back-link,
+.cluster-tab-pill,
+.task-tabs button,
+.export-tabs button,
+.code-subtabs button,
+.tool-button,
+.fit-control {
+  --neo-edge: #334155;
+  background: #ffffff;
+  color: #1e293b;
+}
+
+.code-secondary-button:hover:not(:disabled),
+.copy-button:hover:not(:disabled),
+.closure-btn:hover:not(:disabled),
+.task-back-link:hover:not(:disabled),
+.cluster-tab-pill:hover:not(:disabled),
+.task-tabs button:hover:not(:disabled),
+.export-tabs button:hover:not(:disabled),
+.code-subtabs button:hover:not(:disabled),
+.tool-button:hover:not(:disabled),
+.fit-control:hover:not(:disabled) {
+  --neo-edge: #1d4ed8;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.cancel-create:hover:not(:disabled) {
+  --neo-edge: #1e293b;
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+/* 5. Soft Blue accent buttons */
+.closure-step-helper,
+.closure-add-row-btn,
+.superkey-add-cell,
+.closure-mini-chip,
+.cluster-select-btn,
+.picker-chip-btn,
+.task-prompt-panel header button,
+.task-tabs button.active,
+.export-tabs button.active,
+.tool-button.active {
+  --neo-edge: #1d4ed8;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.cluster-select-btn,
+.picker-chip-btn {
+  background: #ffffff;
+}
+
+.export-tabs button.active,
+.tool-button.active {
+  background: #dbeafe;
+}
+
+.closure-step-helper:hover:not(:disabled),
+.closure-add-row-btn:hover:not(:disabled),
+.superkey-add-cell:hover:not(:disabled),
+.closure-mini-chip:hover:not(:disabled),
+.cluster-select-btn:hover:not(:disabled),
+.picker-chip-btn:hover:not(:disabled),
+.task-prompt-panel header button:hover:not(:disabled),
+.task-tabs button.active:hover:not(:disabled),
+.export-tabs button.active:hover:not(:disabled),
+.tool-button.active:hover:not(:disabled) {
+  --neo-edge: #1e3a8a;
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+/* 6. Red / Danger buttons */
+.task-decline-button,
+.picker-chip-btn.is-clear,
+.closure-row-delete,
+.closure-eq-toggle.is-neq {
+  --neo-edge: #b91c1c;
+  background: #fff1f2;
+  color: #b91c1c;
+}
+
+.task-decline-button,
+.picker-chip-btn.is-clear {
+  background: #ffffff;
+}
+
+.task-decline-button:hover:not(:disabled),
+.picker-chip-btn.is-clear:hover:not(:disabled),
+.closure-row-delete:hover:not(:disabled),
+.closure-eq-toggle.is-neq:hover:not(:disabled) {
+  --neo-edge: #991b1b;
+  background: #ffe4e6;
+  color: #991b1b;
+}
+
+/* 7. Green accent toggle */
+.closure-eq-toggle.is-eq {
+  --neo-edge: #15803d;
+  background: #f0fdf4;
+  color: #15803d;
+}
+.closure-eq-toggle.is-eq:hover:not(:disabled) {
+  --neo-edge: #166534;
+  background: #dcfce7;
+  color: #166534;
+}
+
+/* ── Original Color Preservation (Dark Mode) ── */
+
+html[data-theme="dark"] .create-diagram-button,
+html[data-theme="dark"] .auth-submit,
+html[data-theme="dark"] .primary-button,
+html[data-theme="dark"] .share-button,
+html[data-theme="dark"] .code-run-button,
+html[data-theme="dark"] .closure-btn-primary,
+html[data-theme="dark"] .closure-btn.active,
+html[data-theme="dark"] .cluster-tab-pill.active,
+html[data-theme="dark"] .cluster-select-btn.is-selected,
+html[data-theme="dark"] .picker-chip-btn.is-active-chip,
+html[data-theme="dark"] .code-subtabs button.active {
+  --neo-edge: #93c5fd;
+  background: #2563eb;
+  color: #ffffff;
+  border-color: var(--neo-edge);
+}
+
+html[data-theme="dark"] .create-diagram-button:hover:not(:disabled),
+html[data-theme="dark"] .auth-submit:hover:not(:disabled),
+html[data-theme="dark"] .primary-button:hover:not(:disabled),
+html[data-theme="dark"] .share-button:hover:not(:disabled),
+html[data-theme="dark"] .code-run-button:hover:not(:disabled),
+html[data-theme="dark"] .closure-btn-primary:hover:not(:disabled),
+html[data-theme="dark"] .closure-btn.active:hover:not(:disabled),
+html[data-theme="dark"] .cluster-tab-pill.active:hover:not(:disabled),
+html[data-theme="dark"] .cluster-select-btn.is-selected:hover:not(:disabled),
+html[data-theme="dark"] .picker-chip-btn.is-active-chip:hover:not(:disabled),
+html[data-theme="dark"] .code-subtabs button.active:hover:not(:disabled) {
+  --neo-edge: #dbeafe;
+  background: #1d4ed8;
+  color: #ffffff;
+  border-color: var(--neo-edge);
+}
+
+html[data-theme="dark"] .code-secondary-button,
+html[data-theme="dark"] .cancel-create,
+html[data-theme="dark"] .copy-button,
+html[data-theme="dark"] .closure-btn,
+html[data-theme="dark"] .task-back-link,
+html[data-theme="dark"] .cluster-tab-pill,
+html[data-theme="dark"] .task-tabs button,
+html[data-theme="dark"] .export-tabs button,
+html[data-theme="dark"] .code-subtabs button,
+html[data-theme="dark"] .tool-button,
+html[data-theme="dark"] .fit-control {
+  --neo-edge: #94a3b8;
+  background: #162033;
+  color: #e2e8f0;
+  border-color: var(--neo-edge);
+}
+
+html[data-theme="dark"] .code-secondary-button:hover:not(:disabled),
+html[data-theme="dark"] .copy-button:hover:not(:disabled),
+html[data-theme="dark"] .closure-btn:hover:not(:disabled),
+html[data-theme="dark"] .task-back-link:hover:not(:disabled),
+html[data-theme="dark"] .cluster-tab-pill:hover:not(:disabled),
+html[data-theme="dark"] .task-tabs button:hover:not(:disabled),
+html[data-theme="dark"] .export-tabs button:hover:not(:disabled),
+html[data-theme="dark"] .code-subtabs button:hover:not(:disabled),
+html[data-theme="dark"] .tool-button:hover:not(:disabled),
+html[data-theme="dark"] .fit-control:hover:not(:disabled) {
+  --neo-edge: #60a5fa;
+  background: #1e2d48;
+  color: #bfdbfe;
+  border-color: var(--neo-edge);
+}
+
+html[data-theme="dark"] .cancel-create:hover:not(:disabled) {
+  --neo-edge: #cbd5e1;
+  background: #1e293b;
+  color: #f8fafc;
+  border-color: var(--neo-edge);
+}
+
+html[data-theme="dark"] .closure-step-helper,
+html[data-theme="dark"] .closure-add-row-btn,
+html[data-theme="dark"] .superkey-add-cell,
+html[data-theme="dark"] .closure-mini-chip,
+html[data-theme="dark"] .cluster-select-btn,
+html[data-theme="dark"] .picker-chip-btn,
+html[data-theme="dark"] .task-prompt-panel header button,
+html[data-theme="dark"] .task-tabs button.active,
+html[data-theme="dark"] .export-tabs button.active,
+html[data-theme="dark"] .tool-button.active {
+  --neo-edge: #60a5fa;
+  background: #172542;
+  color: #93c5fd;
+  border-color: var(--neo-edge);
+}
+
+html[data-theme="dark"] .closure-step-helper:hover:not(:disabled),
+html[data-theme="dark"] .closure-add-row-btn:hover:not(:disabled),
+html[data-theme="dark"] .superkey-add-cell:hover:not(:disabled),
+html[data-theme="dark"] .closure-mini-chip:hover:not(:disabled),
+html[data-theme="dark"] .cluster-select-btn:hover:not(:disabled),
+html[data-theme="dark"] .picker-chip-btn:hover:not(:disabled),
+html[data-theme="dark"] .task-prompt-panel header button:hover:not(:disabled),
+html[data-theme="dark"] .task-tabs button.active:hover:not(:disabled),
+html[data-theme="dark"] .export-tabs button.active:hover:not(:disabled),
+html[data-theme="dark"] .tool-button.active:hover:not(:disabled) {
+  --neo-edge: #93c5fd;
+  background: #1e3259;
+  color: #dbeafe;
+  border-color: var(--neo-edge);
+}
+
+html[data-theme="dark"] .task-decline-button,
+html[data-theme="dark"] .picker-chip-btn.is-clear,
+html[data-theme="dark"] .closure-row-delete,
+html[data-theme="dark"] .closure-eq-toggle.is-neq {
+  --neo-edge: #f87171;
+  background: #2b131b;
+  color: #fca5a5;
+  border-color: var(--neo-edge);
+}
+
+html[data-theme="dark"] .task-decline-button:hover:not(:disabled),
+html[data-theme="dark"] .picker-chip-btn.is-clear:hover:not(:disabled),
+html[data-theme="dark"] .closure-row-delete:hover:not(:disabled),
+html[data-theme="dark"] .closure-eq-toggle.is-neq:hover:not(:disabled) {
+  --neo-edge: #fca5a5;
+  background: #3d1824;
+  color: #fecaca;
+  border-color: var(--neo-edge);
+}
+
+html[data-theme="dark"] .closure-eq-toggle.is-eq {
+  --neo-edge: #4ade80;
+  background: #0d2b1d;
+  color: #86efac;
+  border-color: var(--neo-edge);
+}
+
+html[data-theme="dark"] .closure-eq-toggle.is-eq:hover:not(:disabled) {
+  --neo-edge: #86efac;
+  background: #143d29;
+  color: #bbf7d0;
+  border-color: var(--neo-edge);
+}
+
+/* ── Shared Hover / Active / Disabled Tactile Behavior (Both Light & Dark) ── */
+.create-diagram-button:hover:not(:disabled),
+.auth-submit:hover:not(:disabled),
+.primary-button:hover:not(:disabled),
+.share-button:hover:not(:disabled),
+.code-run-button:hover:not(:disabled),
+.submit-task-button:hover:not(:disabled),
+.dashboard-user > button:not(.user-avatar-btn):hover:not(:disabled),
+.logout-button:hover:not(:disabled),
+.task-editor-link:hover:not(:disabled),
+.code-secondary-button:hover:not(:disabled),
+.cancel-create:hover:not(:disabled),
+.copy-button:hover:not(:disabled),
+.task-decline-button:hover:not(:disabled),
+.task-back-link:hover:not(:disabled),
+.task-tabs button:hover:not(:disabled),
+.export-tabs button:hover:not(:disabled),
+.code-subtabs button:hover:not(:disabled),
+.tool-button:hover:not(:disabled),
+.fit-control:hover:not(:disabled),
+.task-prompt-panel header button:hover:not(:disabled),
+.closure-btn:hover:not(:disabled),
+.closure-step-helper:hover:not(:disabled),
+.closure-add-row-btn:hover:not(:disabled),
+.closure-row-delete:hover:not(:disabled),
+.closure-mini-chip:hover:not(:disabled),
+.closure-eq-toggle:hover:not(:disabled),
+.superkey-add-cell:hover:not(:disabled),
+.cluster-tab-pill:hover:not(:disabled),
+.cluster-select-btn:hover:not(:disabled),
+.picker-chip-btn:hover:not(:disabled) {
+  transform: none;
+  border-color: var(--neo-edge);
+  box-shadow: var(--neo-shift) var(--neo-shift) 0 var(--neo-edge);
+}
+
+.create-diagram-button:active:not(:disabled),
+.auth-submit:active:not(:disabled),
+.primary-button:active:not(:disabled),
+.share-button:active:not(:disabled),
+.code-run-button:active:not(:disabled),
+.submit-task-button:active:not(:disabled),
+.dashboard-user > button:not(.user-avatar-btn):active:not(:disabled),
+.logout-button:active:not(:disabled),
+.task-editor-link:active:not(:disabled),
+.code-secondary-button:active:not(:disabled),
+.cancel-create:active:not(:disabled),
+.copy-button:active:not(:disabled),
+.task-decline-button:active:not(:disabled),
+.task-back-link:active:not(:disabled),
+.task-tabs button:active:not(:disabled),
+.export-tabs button:active:not(:disabled),
+.code-subtabs button:active:not(:disabled),
+.tool-button:active:not(:disabled),
+.fit-control:active:not(:disabled),
+.task-prompt-panel header button:active:not(:disabled),
+.closure-btn:active:not(:disabled),
+.closure-step-helper:active:not(:disabled),
+.closure-add-row-btn:active:not(:disabled),
+.closure-row-delete:active:not(:disabled),
+.closure-mini-chip:active:not(:disabled),
+.closure-eq-toggle:active:not(:disabled),
+.superkey-add-cell:active:not(:disabled),
+.cluster-tab-pill:active:not(:disabled),
+.cluster-select-btn:active:not(:disabled),
+.picker-chip-btn:active:not(:disabled),
+html[data-theme="dark"] .create-diagram-button:active:not(:disabled),
+html[data-theme="dark"] .auth-submit:active:not(:disabled),
+html[data-theme="dark"] .primary-button:active:not(:disabled),
+html[data-theme="dark"] .share-button:active:not(:disabled),
+html[data-theme="dark"] .code-run-button:active:not(:disabled),
+html[data-theme="dark"] .submit-task-button:active:not(:disabled),
+html[data-theme="dark"] .code-secondary-button:active:not(:disabled),
+html[data-theme="dark"] .cancel-create:active:not(:disabled),
+html[data-theme="dark"] .copy-button:active:not(:disabled),
+html[data-theme="dark"] .task-decline-button:active:not(:disabled),
+html[data-theme="dark"] .task-back-link:active:not(:disabled),
+html[data-theme="dark"] .task-tabs button:active:not(:disabled),
+html[data-theme="dark"] .export-tabs button:active:not(:disabled),
+html[data-theme="dark"] .code-subtabs button:active:not(:disabled),
+html[data-theme="dark"] .tool-button:active:not(:disabled),
+html[data-theme="dark"] .fit-control:active:not(:disabled),
+html[data-theme="dark"] .task-prompt-panel header button:active:not(:disabled),
+html[data-theme="dark"] .closure-btn:active:not(:disabled),
+html[data-theme="dark"] .closure-step-helper:active:not(:disabled),
+html[data-theme="dark"] .closure-add-row-btn:active:not(:disabled),
+html[data-theme="dark"] .closure-row-delete:active:not(:disabled),
+html[data-theme="dark"] .closure-mini-chip:active:not(:disabled),
+html[data-theme="dark"] .closure-eq-toggle:active:not(:disabled),
+html[data-theme="dark"] .superkey-add-cell:active:not(:disabled),
+html[data-theme="dark"] .cluster-tab-pill:active:not(:disabled),
+html[data-theme="dark"] .cluster-select-btn:active:not(:disabled),
+html[data-theme="dark"] .picker-chip-btn:active:not(:disabled) {
+  box-shadow: none;
+  transform: translate(var(--neo-shift), var(--neo-shift));
+}
+
+.create-diagram-button:disabled,
+.auth-submit:disabled,
+.primary-button:disabled,
+.share-button:disabled,
+.code-run-button:disabled,
+.submit-task-button:disabled,
+.code-secondary-button:disabled,
+.cancel-create:disabled,
+.copy-button:disabled,
+.task-decline-button:disabled,
+.closure-btn:disabled,
+.picker-chip-btn:disabled,
+html[data-theme="dark"] .create-diagram-button:disabled,
+html[data-theme="dark"] .code-secondary-button:disabled,
+html[data-theme="dark"] .picker-chip-btn:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+
+/* ─── Gradient Block Progress Bar (Uiverse.io by thekuntal49)
+   Retro high-contrast frame with bright blue -> green gradient fill & crisp percentage number */
+.neo-progress-loader {
+  --progress-pct: 0%;
+  position: relative;
+  width: 100%;
+  height: 32px;
+  background-color: #050811;
+  border: 3px solid #0f172a;
+  box-shadow: 3px 3px 0 #0f172a;
+  overflow: hidden;
+  user-select: none;
+}
+
+.neo-progress-loader.is-sm {
+  margin-top: 10px;
+  max-width: 340px;
+  height: 24px;
+  border-width: 2.5px;
+  box-shadow: 2px 2px 0 #0f172a;
+}
+
+.neo-progress-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--progress-pct);
+  height: 100%;
+  background: linear-gradient(90deg, #38bdf8 0%, #22d3ee 36%, #2dd4bf 68%, #22c55e 100%);
+  background-size: 160% 100%;
+  animation: neoProgressFlow 3.2s ease-in-out infinite;
+  transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.neo-progress-fill::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.28) 0%,
+    rgba(255, 255, 255, 0) 48%,
+    rgba(0, 0, 0, 0.08) 100%
+  );
+  pointer-events: none;
+}
+
+.neo-progress-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Manrope', 'DM Sans', sans-serif;
+  font-weight: 800;
+  font-size: 0.95rem;
+  letter-spacing: 0.5px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.neo-progress-loader.is-sm .neo-progress-label {
+  font-size: 0.78rem;
+}
+
+.neo-progress-label.is-base {
+  z-index: 2;
+  color: #ffffff;
+}
+
+.neo-progress-label.is-fill {
+  z-index: 3;
+  color: #020617;
+  clip-path: inset(0 calc(100% - var(--progress-pct)) 0 0);
+  transition: clip-path 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes neoProgressFlow {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+html[data-theme="dark"] .neo-progress-loader {
+  background-color: #000000;
+  border-color: #f8fafc;
+  box-shadow: 3px 3px 0 rgba(248, 250, 252, 0.9);
+}
+
+html[data-theme="dark"] .neo-progress-loader.is-sm {
+  box-shadow: 2px 2px 0 rgba(248, 250, 252, 0.9);
+}
+
+
+/* ─── Login / Register Neo-Brutalist Form (Uiverse.io by D3OXY — Pure White/Black bg + Blue accents) */
+.d3oxy-auth-page {
+  background: #ffffff;
+}
+
+.d3oxy-auth-card {
+  --d3-bg: #ffffff;
+  --d3-surface: #ffffff;
+  --d3-main: #1e3a8a;
+  --d3-primary: #2563eb;
+  --d3-primary-dark: #1d4ed8;
+  --d3-focus: #2563eb;
+  --d3-font: #0f172a;
+  --d3-sub: #475569;
+
+  position: relative;
+  z-index: 1;
+  width: min(390px, 100%);
+  padding: 24px 26px 22px;
+  background: var(--d3-bg);
+  border-radius: 8px;
+  border: 2.5px solid var(--d3-main);
+  box-shadow: 6px 6px 0 var(--d3-main);
+}
+
+.d3oxy-auth-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.d3oxy-auth-logo {
+  width: 64px;
+  height: 64px;
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 2px solid var(--d3-main);
+  box-shadow: 3px 3px 0 var(--d3-main);
+  background: var(--d3-surface);
+}
+
+.d3oxy-auth-logo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.d3oxy-auth-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 2px solid var(--d3-main);
+  box-shadow: 3px 3px 0 var(--d3-main);
+  background: var(--d3-surface);
+  color: var(--d3-primary);
+  font-family: 'Manrope', sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.d3oxy-form {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 15px;
+}
+
+.d3oxy-title {
+  margin: 0 0 4px;
+  font-family: 'Manrope', sans-serif;
+  color: var(--d3-font);
+  font-weight: 800;
+  font-size: 22px;
+  line-height: 1.25;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.d3oxy-title > span {
+  font-family: 'DM Sans', sans-serif;
+  color: var(--d3-sub);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.d3oxy-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.d3oxy-field > span {
+  color: var(--d3-font);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.d3oxy-input {
+  width: 100%;
+  height: 44px;
+  border-radius: 6px;
+  border: 2px solid var(--d3-main);
+  background-color: var(--d3-surface);
+  box-shadow: 4px 4px 0 var(--d3-main);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--d3-font);
+  padding: 6px 12px;
+  outline: none;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.1s ease;
+}
+
+.d3oxy-input::placeholder {
+  color: #7e97bd;
+  font-weight: 500;
+}
+
+.d3oxy-input:focus {
+  border-color: var(--d3-focus);
+  box-shadow: 4px 4px 0 var(--d3-focus);
+}
+
+.d3oxy-btn {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 6px;
+  border: 2px solid var(--d3-main);
+  box-shadow: 4px 4px 0 var(--d3-main);
+  font-family: 'Manrope', 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+  transition: color 250ms ease, transform 90ms ease, box-shadow 90ms ease;
+}
+
+.d3oxy-btn::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0;
+  z-index: -1;
+  box-shadow: 4px 8px 19px -3px rgba(15, 37, 87, 0.3);
+  transition: width 250ms ease;
+}
+
+.d3oxy-btn:hover:not(:disabled)::before {
+  width: 100%;
+}
+
+.d3oxy-btn:active:not(:disabled) {
+  box-shadow: none;
+  transform: translate(4px, 4px);
+}
+
+.d3oxy-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+  box-shadow: none;
+  transform: none;
+}
+
+.d3oxy-btn.is-primary {
+  margin-top: 4px;
+  background-color: var(--d3-primary);
+  color: #ffffff;
+}
+
+.d3oxy-btn.is-primary::before {
+  background-color: var(--d3-main);
+}
+
+.d3oxy-btn.is-primary:hover:not(:disabled) {
+  color: #ffffff;
+}
+
+.d3oxy-btn.is-secondary {
+  background-color: var(--d3-surface);
+  color: var(--d3-primary);
+  font-size: 13px;
+}
+
+.d3oxy-btn.is-secondary::before {
+  background-color: var(--d3-primary);
+}
+
+.d3oxy-btn.is-secondary:hover {
+  color: #ffffff;
+}
+
+.d3oxy-icon {
+  flex: 0 0 auto;
+  transition: transform 200ms ease;
+}
+
+.d3oxy-btn:hover:not(:disabled) .d3oxy-icon {
+  transform: translateX(3px);
+}
+
+.d3oxy-separator {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 2px 0;
+}
+
+.d3oxy-separator > div {
+  flex: 1;
+  height: 3px;
+  border-radius: 5px;
+  background-color: var(--d3-main);
+  opacity: 0.45;
+}
+
+.d3oxy-separator > span {
+  color: var(--d3-font);
+  font-family: 'Manrope', sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.d3oxy-error {
+  border-radius: 6px;
+  border: 2px solid #b91c1c;
+  box-shadow: 3px 3px 0 #b91c1c;
+  font-weight: 600;
+}
+
+.d3oxy-notice {
+  margin: 0;
+  border-radius: 6px;
+  border: 2px solid #b45309;
+  box-shadow: 3px 3px 0 #b45309;
+}
+
+.d3oxy-security {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 2px dashed rgba(30, 58, 138, 0.25);
+  color: var(--d3-sub);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.d3oxy-security span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #2563eb;
+}
+
+/* Dark mode — Pure Black bg + Blue Neo-Brutalist accents */
+html[data-theme="dark"] .d3oxy-auth-page {
+  background: #000000;
+}
+
+html[data-theme="dark"] .d3oxy-auth-card {
+  --d3-bg: #0a0a0a;
+  --d3-surface: #111111;
+  --d3-main: #60a5fa;
+  --d3-primary: #2563eb;
+  --d3-focus: #93c5fd;
+  --d3-font: #ffffff;
+  --d3-sub: #94a3b8;
+}
+
+html[data-theme="dark"] .d3oxy-auth-badge {
+  color: #93c5fd;
+}
+
+html[data-theme="dark"] .d3oxy-input::placeholder {
+  color: #64748b;
+}
+
+html[data-theme="dark"] .d3oxy-btn.is-primary::before {
+  background-color: #1d4ed8;
+}
+
+html[data-theme="dark"] .d3oxy-btn.is-secondary {
+  color: #93c5fd;
+}
+
+html[data-theme="dark"] .d3oxy-btn.is-secondary:hover {
+  color: #ffffff;
+}
+
+html[data-theme="dark"] .d3oxy-security {
+  border-top-color: rgba(96, 165, 250, 0.28);
+}
+
+html[data-theme="dark"] .d3oxy-security span {
+  background: #60a5fa;
+}
+
+@media (max-width: 760px) {
+  .d3oxy-auth-card {
+    padding: 20px 18px 18px;
+    box-shadow: 5px 5px 0 var(--d3-main);
+  }
 }

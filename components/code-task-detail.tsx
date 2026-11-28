@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import AccountAvatarButton from "@/components/account-avatar-button";
 import BoxesLoader from "@/components/boxes-loader";
 import CodeEditorPane from "@/components/code-editor-pane";
+import GradientProgressBar from "@/components/gradient-progress-bar";
 import ThemeToggle from "@/components/theme-toggle";
 import TopNavGlass from "@/components/top-nav-glass";
 import { DueDateAssignField, DueDateEditorCard, localDateTimeInputToIso } from "@/components/due-date-control";
@@ -1186,12 +1187,11 @@ export default function CodeTaskDetail({ taskId }: { taskId: string }) {
 
               {autoGradeResult && (
                 <div className="code-progress-bar-wrap">
-                  <div className="code-progress-bar-track">
-                    <div
-                      className={`code-progress-bar-fill ${autoGradeResult.passed ? "is-pass" : "is-fail"}`}
-                      style={{ width: `${autoGradeResult.percentage}%` }}
-                    />
-                  </div>
+                  <GradientProgressBar
+                    percentage={autoGradeResult.percentage}
+                    size="md"
+                    ariaLabel={`Tiến độ đạt tiêu chí ${autoGradeResult.percentage}%`}
+                  />
                 </div>
               )}
 
@@ -1315,12 +1315,11 @@ export default function CodeTaskDetail({ taskId }: { taskId: string }) {
                       </small>
                     </div>
                   </div>
-                  <div className="code-progress-bar-track">
-                    <div
-                      className={`code-progress-bar-fill ${studentDisplayGrade.passed ? "is-pass" : "is-fail"}`}
-                      style={{ width: `${studentDisplayGrade.percentage}%` }}
-                    />
-                  </div>
+                  <GradientProgressBar
+                    percentage={studentDisplayGrade.percentage}
+                    size="md"
+                    ariaLabel={`Kết quả chấm tự động ${studentDisplayGrade.percentage}%`}
+                  />
                 </div>
               )}
 

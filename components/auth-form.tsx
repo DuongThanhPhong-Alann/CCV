@@ -133,26 +133,135 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
     );
   }
 
-  return <main className="auth-page">
-    <div className="auth-theme-corner"><ThemeToggle /></div>
-    <div className="auth-glow auth-glow-one" /><div className="auth-glow auth-glow-two" />
-    <section className="auth-card">
-      <Link className="auth-logo" href="/"><Image src="/erd-draw-logo.png" alt="ERD Draw" width={144} height={96} priority unoptimized /></Link>
-      <div className="auth-heading"><span className="auth-eyebrow">ERD DRAW WORKSPACE</span><h1>{isRegister ? "Tạo tài khoản của bạn" : "Chào mừng trở lại"}</h1><p>{isRegister ? "Đăng ký để lưu và quản lý sơ đồ cơ sở dữ liệu." : "Đăng nhập để tiếp tục thiết kế sơ đồ của bạn."}</p></div>
-      {timeoutNotice && !isRegister && (
-        <div className="auth-timeout-notice" role="status">
-          ⏱ Phiên đăng nhập đã tự động đăng xuất do không hoạt động quá 30 phút. Vui lòng đăng nhập lại để tiếp tục.
+  return (
+    <main className="auth-page d3oxy-auth-page">
+      <div className="auth-theme-corner"><ThemeToggle /></div>
+      <section className="d3oxy-auth-card">
+        <div className="d3oxy-auth-top">
+          <Link className="d3oxy-auth-logo" href="/">
+            <Image src="/erd-draw-logo.png" alt="ERD Draw" width={144} height={96} priority unoptimized />
+          </Link>
+          <span className="d3oxy-auth-badge">ERD DRAW</span>
         </div>
-      )}
-      <form className="auth-form" onSubmit={submit}>
-        {isRegister && <label>Họ và tên<input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" minLength={2} maxLength={80} required placeholder="Nguyễn Văn An" /></label>}
-        <label>Email<input value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" required placeholder="ban@congty.com" /></label>
-        <label>Mật khẩu<input value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete={isRegister ? "new-password" : "current-password"} minLength={8} maxLength={100} required placeholder="Ít nhất 8 ký tự" /></label>
-        {error && <div className="auth-error" role="alert">{error}</div>}
-        <button className="auth-submit" type="submit" disabled={busy}>{busy ? "Đang xử lý…" : isRegister ? "Tạo tài khoản" : "Đăng nhập"}</button>
-      </form>
-      <div className="auth-switch">{isRegister ? "Đã có tài khoản?" : "Chưa có tài khoản?"} <Link href={isRegister ? "/login" : "/register"}>{isRegister ? "Đăng nhập" : "Tạo tài khoản mới"}</Link></div>
-      <div className="auth-security"><span />Mỗi tài khoản chỉ xem và sửa sơ đồ của chính mình</div>
-    </section>
-  </main>;
+
+        <form className="d3oxy-form" onSubmit={submit}>
+          <p className="d3oxy-title">
+            {isRegister ? "Tạo tài khoản," : "Chào mừng trở lại,"}
+            <span>
+              {isRegister
+                ? "đăng ký để lưu & quản lý sơ đồ"
+                : "đăng nhập để tiếp tục làm việc"}
+            </span>
+          </p>
+
+          {timeoutNotice && !isRegister && (
+            <div className="auth-timeout-notice d3oxy-notice" role="status">
+              ⏱ Phiên đăng nhập đã tự động đăng xuất do không hoạt động quá 30 phút. Vui lòng đăng nhập lại.
+            </div>
+          )}
+
+          {isRegister && (
+            <label className="d3oxy-field">
+              <span>Họ và tên</span>
+              <input
+                className="d3oxy-input"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                autoComplete="name"
+                minLength={2}
+                maxLength={80}
+                required
+                placeholder="Nguyễn Văn An"
+              />
+            </label>
+          )}
+
+          <label className="d3oxy-field">
+            <span>Email</span>
+            <input
+              className="d3oxy-input"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              type="email"
+              autoComplete="email"
+              required
+              placeholder="ban@congty.com"
+            />
+          </label>
+
+          <label className="d3oxy-field">
+            <span>Mật khẩu</span>
+            <input
+              className="d3oxy-input"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              type="password"
+              autoComplete={isRegister ? "new-password" : "current-password"}
+              minLength={8}
+              maxLength={100}
+              required
+              placeholder="Ít nhất 8 ký tự"
+            />
+          </label>
+
+          {error && (
+            <div className="auth-error d3oxy-error" role="alert">
+              {error}
+            </div>
+          )}
+
+          <button className="d3oxy-btn is-primary" type="submit" disabled={busy}>
+            <span>{busy ? "Đang xử lý…" : isRegister ? "Tạo tài khoản" : "Tiếp tục đăng nhập"}</span>
+            <svg
+              className="d3oxy-icon"
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="m6 17 5-5-5-5" />
+              <path d="m13 17 5-5-5-5" />
+            </svg>
+          </button>
+
+          <div className="d3oxy-separator" aria-hidden="true">
+            <div />
+            <span>HOẶC</span>
+            <div />
+          </div>
+
+          <Link className="d3oxy-btn is-secondary" href={isRegister ? "/login" : "/register"}>
+            <span>{isRegister ? "Đã có tài khoản? Đăng nhập" : "Chưa có tài khoản? Đăng ký"}</span>
+            <svg
+              className="d3oxy-icon"
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M5 12h14" />
+              <path d="m12 5 7 7-7 7" />
+            </svg>
+          </Link>
+        </form>
+
+        <div className="d3oxy-security">
+          <span />
+          Mỗi tài khoản chỉ xem và sửa sơ đồ của chính mình
+        </div>
+      </section>
+    </main>
+  );
 }

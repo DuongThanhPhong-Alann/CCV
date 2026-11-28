@@ -1,12 +1,12 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { ActivityKind } from "@/lib/activity-types";
 import { SESSION_IDLE_TIMEOUT_MS, readLastActivityAt } from "@/lib/session-activity";
 
-const HEARTBEAT_INTERVAL_MS = 45_000;
-const ACTIVE_INTERACTION_WINDOW_MS = 3 * 60 * 1000;
+const HEARTBEAT_INTERVAL_MS = 10_000;
+const INTERACTION_PING_THROTTLE_MS = 6_000;
 
 function parseRouteActivity(pathname: string): {
   kind: ActivityKind;
@@ -50,17 +50,27 @@ function sendBeaconOrKeepalive(payload: Record<string, unknown>) {
 export default function ActivityTracker() {
   const pathname = usePathname();
   const isAuthPage = !pathname || pathname === "/login" || pathname === "/register";
+  const latestRouteRef = useRef<{ kind: ActivityKind; path: string; targetId: string | null } | null>(null);
 
   useEffect(() => {
-    if (isAuthPage || !pathname) return;
+    if (isAuthPage || !pathname) {
+      latestRouteRef.current = null;
+      return;
+    }
 
     const route = parseRouteActivity(pathname);
+    latestRouteRef.current = route;
     let stopped = false;
+    let lastPingAt = 0;
+
+    const isSessionStillActive = () => {
+      const lastAct = readLastActivityAt();
+      return lastAct === null || Date.now() - lastAct < SESSION_IDLE_TIMEOUT_MS;
+    };
 
     const postActivity = (event: "enter" | "heartbeat") => {
-      if (stopped) return;
-      const lastAct = readLastActivityAt();
-      if (lastAct !== null && Date.now() - lastAct >= SESSION_IDLE_TIMEOUT_MS) return;
+      if (stopped || !isSessionStillActive()) return;
+      lastPingAt = Date.now();
       void fetch("/api/activity/heartbeat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -71,34 +81,50 @@ export default function ActivityTracker() {
 
     postActivity("enter");
 
+    // Continuous 10s heartbeat keeps admin monitor updated in real time (even in background tabs)
     const intervalId = window.setInterval(() => {
-      if (document.visibilityState !== "visible") return;
-      const lastAct = readLastActivityAt();
-      if (lastAct !== null && Date.now() - lastAct > ACTIVE_INTERACTION_WINDOW_MS) return;
+      if (!isSessionStillActive()) return;
       postActivity("heartbeat");
     }, HEARTBEAT_INTERVAL_MS);
 
+    const handleInteraction = () => {
+      if (stopped || Date.now() - lastPingAt < INTERACTION_PING_THROTTLE_MS) return;
+      postActivity("heartbeat");
+    };
+
     const handleVisibilityChange = () => {
+      if (!isSessionStillActive()) return;
       if (document.visibilityState === "hidden") {
-        sendBeaconOrKeepalive({ event: "leave", ...route });
+        sendBeaconOrKeepalive({ event: "heartbeat", ...route });
       } else {
-        postActivity("enter");
+        postActivity("heartbeat");
       }
     };
 
+    const handleFocus = () => {
+      if (!isSessionStillActive()) return;
+      postActivity("heartbeat");
+    };
+
     const handlePageHide = () => {
-      sendBeaconOrKeepalive({ event: "leave", ...route });
+      const current = latestRouteRef.current ?? route;
+      sendBeaconOrKeepalive({ event: "leave", ...current });
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
     window.addEventListener("pagehide", handlePageHide);
+    window.addEventListener("pointerdown", handleInteraction, { passive: true });
+    window.addEventListener("keydown", handleInteraction, { passive: true });
 
     return () => {
       stopped = true;
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
       window.removeEventListener("pagehide", handlePageHide);
-      sendBeaconOrKeepalive({ event: "leave", ...route });
+      window.removeEventListener("pointerdown", handleInteraction);
+      window.removeEventListener("keydown", handleInteraction);
     };
   }, [isAuthPage, pathname]);
 

@@ -9,11 +9,15 @@ export const SOUND_FILES: Record<SoundEffectKey, string> = {
 };
 
 const MUTE_STORAGE_KEY = "ccv_sound_muted";
+const CLICK_POOL_SIZE = 4;
 
 let audioCtx: AudioContext | null = null;
 const decodedBuffers = new Map<SoundEffectKey, AudioBuffer>();
 const decodingPromises = new Map<SoundEffectKey, Promise<AudioBuffer | null>>();
 const htmlAudioPool = new Map<SoundEffectKey, HTMLAudioElement>();
+const clickAudioPool: HTMLAudioElement[] = [];
+let clickPoolIndex = 0;
+let lastClickAt = 0;
 let activeFeedbackSource: AudioBufferSourceNode | null = null;
 let activeFeedbackElement: HTMLAudioElement | null = null;
 let activeClickSource: AudioBufferSourceNode | null = null;
@@ -37,6 +41,27 @@ function getAudioContext(): AudioContext | null {
     void audioCtx.resume().catch(() => {});
   }
   return audioCtx;
+}
+
+export function unlockAudio() {
+  if (!canUseAudio()) return;
+  const ctx = getAudioContext();
+  if (ctx && ctx.state === "suspended") {
+    void ctx.resume().catch(() => {});
+  }
+  if (!decodedBuffers.has("click")) {
+    void ensureBuffer("click");
+  }
+}
+
+function ensureClickPool() {
+  if (!canUseAudio() || clickAudioPool.length > 0) return;
+  for (let i = 0; i < CLICK_POOL_SIZE; i += 1) {
+    const el = new Audio(SOUND_FILES.click);
+    el.preload = "auto";
+    el.volume = 0.72;
+    clickAudioPool.push(el);
+  }
 }
 
 function getHtmlAudio(key: SoundEffectKey): HTMLAudioElement | null {
@@ -120,6 +145,8 @@ export function stopAllSounds() {
 export function preloadSounds() {
   if (!canUseAudio() || preloaded) return;
   preloaded = true;
+  ensureClickPool();
+  clickAudioPool.forEach((el) => el.load());
   (["click", "pass", "wrong"] as SoundEffectKey[]).forEach((key) => {
     const el = getHtmlAudio(key);
     el?.load();
@@ -128,15 +155,22 @@ export function preloadSounds() {
 }
 
 function playViaHtmlAudio(key: SoundEffectKey) {
-  const baseEl = getHtmlAudio(key);
-  if (!baseEl) return;
-
   if (key === "click") {
-    const clone = baseEl.cloneNode(true) as HTMLAudioElement;
-    clone.volume = 0.72;
-    void clone.play().catch(() => {});
+    ensureClickPool();
+    const el = clickAudioPool[clickPoolIndex % clickAudioPool.length];
+    clickPoolIndex = (clickPoolIndex + 1) % clickAudioPool.length;
+    if (!el) return;
+    try {
+      el.pause();
+      el.currentTime = 0;
+    } catch {}
+    el.volume = 0.72;
+    void el.play().catch(() => {});
     return;
   }
+
+  const baseEl = getHtmlAudio(key);
+  if (!baseEl) return;
 
   if (activeFeedbackElement) {
     try {
@@ -153,7 +187,11 @@ function playViaHtmlAudio(key: SoundEffectKey) {
 export function playSound(key: SoundEffectKey) {
   if (!canUseAudio() || isSoundMuted()) return;
 
-  if (key !== "click") {
+  if (key === "click") {
+    const now = performance.now();
+    if (now - lastClickAt < 35) return;
+    lastClickAt = now;
+  } else {
     stopAllSounds();
   }
 
@@ -182,11 +220,11 @@ export function playSound(key: SoundEffectKey) {
       source.start(0);
       return;
     } catch {
-      // fall through to HTMLAudioElement
+      // fall through to HTMLAudioElement pool
     }
   }
 
-  // Trigger decode in background for next presses and play immediately via HTMLAudioElement
+  // Trigger decode in background for next presses and play immediately via preloaded HTMLAudioElement pool
   void ensureBuffer(key);
   playViaHtmlAudio(key);
 }

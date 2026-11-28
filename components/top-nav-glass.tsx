@@ -41,14 +41,10 @@ export default function TopNavGlass({
             <Link
               key={item.key}
               href={item.href}
-              className={`topnav-entry-btn tone-${item.tone} nav-key-${item.key} ${isActive ? "active" : ""}`}
+              className={`topnav-entry-btn tone-${item.tone} ${isActive ? "active" : ""}`}
               aria-current={isActive ? "page" : undefined}
             >
-              <div className="topnav-entry-line" aria-hidden="true" />
-              <div className="topnav-entry-line" aria-hidden="true" />
-              <span className="topnav-entry-text">{item.label}</span>
-              <div className="topnav-entry-drow1" aria-hidden="true" />
-              <div className="topnav-entry-drow2" aria-hidden="true" />
+              {item.label}
             </Link>
           );
         })}
