@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent, ReactNode, WheelEvent as ReactWheelEvent } from "react";
+import BoxesLoader from "@/components/boxes-loader";
+import ThemeToggle from "@/components/theme-toggle";
 import { readJsonResponse } from "@/lib/read-json-response";
 
 type ColumnReference = { entityId: string; columnId: string };
@@ -912,7 +914,7 @@ export default function ErdEditor({ diagramId }: { diagramId: string }) {
 
   if (!ready) {
     return <div className="editor-loading"><div className="loading-brand"><Image src="/erd-draw-logo.png" alt="ERD Draw" width={144} height={96} priority unoptimized /></div>
-      {loadError ? <><h1>Không mở được sơ đồ</h1><p>{loadError}</p><Link href="/">Về danh sách sơ đồ</Link></> : <><span className="loading-spinner" /><p>Đang tải sơ đồ…</p></>}
+      {loadError ? <><h1>Không mở được sơ đồ</h1><p>{loadError}</p><Link href="/">Về danh sách sơ đồ</Link></> : <><BoxesLoader /><p>Đang tải sơ đồ…</p></>}
     </div>;
   }
 
@@ -929,6 +931,7 @@ export default function ErdEditor({ diagramId }: { diagramId: string }) {
         <div className="topbar-right">
           <div className="save-state"><span className={`save-dot ${saved === "saved" ? "is-saved" : saved === "error" ? "has-error" : ""}`} />{saved === "saved" ? "Đã lưu" : saved === "saving" ? "Đang lưu" : "Lỗi lưu"}</div>
           <span className="topbar-separator" />
+          <ThemeToggle />
           {taskId && <><Link className="task-editor-link" href={`/tasks/${taskId}`}>Bài tập</Link><button className="submit-task-button" type="button" onClick={() => void submitTask()} disabled={saved !== "saved" || submittingTask} title={saved !== "saved" ? "Đợi sơ đồ lưu xong rồi nộp" : "Nộp bản vẽ hiện tại"}>{submittingTask ? "Đang nộp…" : "Nộp bài"}</button></>}
           <button className="logout-button" type="button" onClick={() => void signOut({ callbackUrl: "/login" })}>Đăng xuất</button>
           <button className="share-button" type="button" onClick={() => { setExportOpen(true); setExportCopied(false); }} disabled={entities.length === 0} title={entities.length === 0 ? "Thêm bảng trước khi xuất mã" : "Xem và xuất mã tạo cơ sở dữ liệu"}><Icon name="download" size={16} /> Xuất mã</button>
@@ -954,19 +957,11 @@ export default function ErdEditor({ diagramId }: { diagramId: string }) {
             <Icon name="relation" size={17} /><span>Quan hệ</span><kbd>R</kbd>
           </button>
           <select
-            className="relation-type"
+            className={`relation-type ${relationType === "1 : 1" ? "rel-select-1-1" : relationType === "1 : N" ? "rel-select-1-n" : "rel-select-n-m"}`}
             aria-label="Kiểu quan hệ mới"
             title="Chọn kiểu quan hệ: 1:1 (Xanh lá), 1:N (Tím), N:M (Hồng)"
             value={relationType}
             onChange={(event) => setRelationType(event.target.value)}
-            style={{
-              width: "auto",
-              padding: "0 8px",
-              borderColor: relationType === "1 : 1" ? "#86efac" : relationType === "1 : N" ? "#c4b5fd" : "#f472b6",
-              color: relationType === "1 : 1" ? "#15803d" : relationType === "1 : N" ? "#6d28d9" : "#be185d",
-              backgroundColor: relationType === "1 : 1" ? "#f0fdf4" : relationType === "1 : N" ? "#faf5ff" : "#fdf2f8",
-              fontWeight: 700,
-            }}
           >
             <option value="1 : 1">1 : 1 (Xanh lá)</option>
             <option value="1 : N">1 : N (Tím)</option>
@@ -1251,8 +1246,8 @@ export default function ErdEditor({ diagramId }: { diagramId: string }) {
           <span>{relations.length} quan hệ</span>
           <span className="status-divider" />
           <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 9 }}>
-            <span style={{ color: "#854d0e", fontWeight: 700 }}>● Bảng PK (Vàng)</span>
-            <span style={{ color: "#9a3412", fontWeight: 700 }}>● Bảng FK (Đồng)</span>
+            <span className="legend-pk" style={{ color: "#854d0e", fontWeight: 700 }}>● Bảng PK (Vàng)</span>
+            <span className="legend-fk" style={{ color: "#9a3412", fontWeight: 700 }}>● Bảng FK (Đồng)</span>
             <span style={{ color: "#16a34a", fontWeight: 700 }}>● 1:1 (Xanh lá)</span>
             <span style={{ color: "#7c3aed", fontWeight: 700 }}>● 1:N (Tím)</span>
             <span style={{ color: "#db2777", fontWeight: 700 }}>● N:M (Hồng)</span>

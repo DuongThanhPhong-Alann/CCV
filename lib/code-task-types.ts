@@ -141,6 +141,7 @@ export type CodeTask = {
   assignedToId: string | null;
   assignedToName: string | null;
   assignedToEmail: string | null;
+  assignedToImage?: string | null;
   sourceTaskId?: string | null;
   assignedCount?: number;
   deliveries?: CodeTaskDelivery[];

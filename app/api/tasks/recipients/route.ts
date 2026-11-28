@@ -1,5 +1,6 @@
 import { ObjectId } from "mongodb";
 import { listAppDocuments, type AppDocument } from "@/lib/app-data";
+import { resolveUserAvatar } from "@/lib/avatars";
 import { currentOwnerId } from "@/lib/current-user";
 import { getDatabase } from "@/lib/mongodb";
 
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
   const pattern = new RegExp(escaped, "i");
 
   try {
-    const accounts = await listAppDocuments<AppDocument & { name?: string; email?: string }>(
+    const accounts = await listAppDocuments<AppDocument & { name?: string; email?: string; image?: string | null }>(
       "users",
       {
         excludeId: ownerId.toString(),
@@ -27,12 +28,12 @@ export async function GET(request: Request) {
       },
       () =>
         getDatabase()
-          .collection<{ _id: ObjectId; name?: string; email?: string }>("users")
+          .collection<{ _id: ObjectId; name?: string; email?: string; image?: string | null }>("users")
           .find(
             query
               ? { _id: { $ne: ownerId }, $or: [{ name: pattern }, { email: pattern }] }
               : { _id: { $ne: ownerId } },
-            { projection: { _id: 1, name: 1, email: 1 } },
+            { projection: { _id: 1, name: 1, email: 1, image: 1 } },
           )
           .sort({ name: 1, email: 1 })
           .limit(50)
@@ -47,6 +48,12 @@ export async function GET(request: Request) {
           id: account._id.toString(),
           name: account.name || account.email,
           email: account.email,
+          image: resolveUserAvatar({
+            id: account._id.toString(),
+            email: account.email,
+            name: account.name,
+            image: account.image,
+          }),
         })),
     });
   } catch {

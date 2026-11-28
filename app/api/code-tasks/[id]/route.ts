@@ -1,4 +1,5 @@
 import { ObjectId } from "mongodb";
+import { recordUserActivity } from "@/lib/activity-logger";
 import {
   deleteAppDocument,
   findAppDocument,
@@ -598,6 +599,15 @@ export async function PATCH(request: Request, { params }: RouteContext) {
         });
         passEmailSent = passMailResults.some((r) => r.sent);
       }
+      await recordUserActivity({
+        userId: ownerId.toString(),
+        event: "action",
+        kind: "code_task",
+        path: `/code-tasks/${taskId.toString()}`,
+        targetId: taskId.toString(),
+        title: task.title,
+        note: `Run #${runCount} · ${autoGrade.passed ? "PASS" : "Chưa đạt"} ${autoGrade.percentage}%`,
+      });
       return Response.json({ ok: true, lastRun: runSnapshot, grade, emailSent: passEmailSent });
     }
 
@@ -655,6 +665,15 @@ export async function PATCH(request: Request, { params }: RouteContext) {
         },
       );
       if (!updated.updated) return Response.json({ error: "Bài nộp vừa được cập nhật ở nơi khác. Hãy tải lại trang." }, { status: 409 });
+      await recordUserActivity({
+        userId: ownerId.toString(),
+        event: "action",
+        kind: "code_task",
+        path: `/code-tasks/${taskId.toString()}`,
+        targetId: taskId.toString(),
+        title: task.title,
+        note: `Nộp bài v${version} · ${autoGrade.passed ? "PASS" : "Chưa đạt"} ${autoGrade.percentage}%`,
+      });
       return Response.json({ ok: true, submission, grade });
     }
 

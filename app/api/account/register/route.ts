@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { MongoServerError, ObjectId } from "mongodb";
 import { listAppDocuments, writeAppDocument, type AppDocument } from "@/lib/app-data";
+import { pickRandomAvatarForNewUser } from "@/lib/avatars";
 import { sendWelcomeEmail } from "@/lib/mailer";
 import { getDatabase } from "@/lib/mongodb";
 
@@ -27,7 +28,8 @@ export async function POST(request: Request) {
     }, 1);
     if (matches.length) return Response.json({ error: "Email này đã được đăng ký." }, { status: 409 });
     const passwordHash = await bcrypt.hash(password, 12);
-    await writeAppDocument("users", { _id: new ObjectId(), name, email, emailVerified: null, image: null, passwordHash, createdAt: new Date() });
+    const initialAvatar = pickRandomAvatarForNewUser(email).src;
+    await writeAppDocument("users", { _id: new ObjectId(), name, email, emailVerified: null, image: initialAvatar, passwordHash, createdAt: new Date() });
     const mailResult = await sendWelcomeEmail({ toEmail: email, toName: name });
     return Response.json({ ok: true, emailSent: mailResult.sent }, { status: 201 });
   } catch (error) {

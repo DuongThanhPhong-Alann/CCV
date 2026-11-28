@@ -1,4 +1,5 @@
 import { ObjectId } from "mongodb";
+import { recordUserActivity } from "@/lib/activity-logger";
 import { deleteAppDocument, findAppDocument, listAppDocuments, patchAppDocument, writeAppDocument, type AppDocument } from "@/lib/app-data";
 import { currentOwnerId } from "@/lib/current-user";
 import { isMailConfigured, sendDueDateUpdatedEmail, sendTaskGradedEmail, sendTasksAssignedEmail } from "@/lib/mailer";
@@ -339,6 +340,15 @@ export async function PATCH(request: Request, { params }: RouteContext) {
         submissionVersion: task.submission?.version ?? null,
       });
       if (!updated.updated) return Response.json({ error: "Bài nộp vừa được cập nhật ở nơi khác. Hãy tải lại trang." }, { status: 409 });
+      await recordUserActivity({
+        userId: ownerId.toString(),
+        event: "action",
+        kind: "erd_task",
+        path: `/tasks/${taskId.toString()}`,
+        targetId: taskId.toString(),
+        title: task.title,
+        note: `Đã nộp bản vẽ v${snapshot.version}`,
+      });
       return Response.json({ ok: true, version: snapshot.version, submittedAt: snapshot.submittedAt });
     }
 

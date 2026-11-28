@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import IosCheckbox from "@/components/ios-checkbox";
+import { resolveUserAvatar } from "@/lib/avatars";
 import { readJsonResponse } from "@/lib/read-json-response";
 
 export type RecipientAccount = {
   id: string;
   name: string;
   email: string;
+  image?: string | null;
 };
 
 type MultiRecipientPickerProps = {
@@ -152,12 +155,27 @@ export default function MultiRecipientPicker({
                 key={account.id}
                 className={`multi-recipient-option ${isChecked ? "is-checked" : ""}`}
               >
-                <input
-                  type="checkbox"
+                <IosCheckbox
+                  size="sm"
                   checked={isChecked}
                   disabled={busy}
+                  ariaLabel={`Chọn ${account.name}`}
                   onChange={() => toggleRecipient(account)}
                 />
+                <span className="recipient-mini-avatar">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={resolveUserAvatar({
+                      id: account.id,
+                      email: account.email,
+                      name: account.name,
+                      image: account.image,
+                    })}
+                    alt={account.name}
+                    className="avatar-img"
+                    loading="lazy"
+                  />
+                </span>
                 <span className="multi-recipient-info">
                   <strong>{account.name}</strong>
                   <small>{account.email}</small>

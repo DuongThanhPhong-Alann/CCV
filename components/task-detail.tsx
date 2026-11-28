@@ -5,13 +5,18 @@ import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
+import AccountAvatarButton from "@/components/account-avatar-button";
+import BoxesLoader from "@/components/boxes-loader";
+import ThemeToggle from "@/components/theme-toggle";
+import TopNavGlass from "@/components/top-nav-glass";
 import { DueDateAssignField, DueDateEditorCard, localDateTimeInputToIso } from "@/components/due-date-control";
 import MultiRecipientPicker, { type RecipientAccount } from "@/components/multi-recipient-picker";
+import { isActivityAdminEmail } from "@/lib/activity-types";
 import { readJsonResponse } from "@/lib/read-json-response";
 import type { AssignmentTask } from "@/lib/task-types";
 
 type ViewerRole = "creator" | "assignee";
-type Account = { id: string; name: string | null; email: string | null };
+type Account = { id: string; name: string | null; email: string | null; image?: string | null };
 
 function formatDate(value?: string | null) {
   return value ? new Date(value).toLocaleString("vi-VN", { dateStyle: "medium", timeStyle: "short" }) : "—";
@@ -38,6 +43,7 @@ export default function TaskDetail({ taskId }: { taskId: string }) {
   const [score, setScore] = useState("");
   const [feedback, setFeedback] = useState("");
   const [assignDueAtLocal, setAssignDueAtLocal] = useState("");
+  const [returnAssignee, setReturnAssignee] = useState("");
 
   const loadTask = async () => {
     setLoading(true);
@@ -64,7 +70,13 @@ export default function TaskDetail({ taskId }: { taskId: string }) {
     }
   };
 
-  useEffect(() => { void loadTask(); }, [taskId]);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      setReturnAssignee(params.get("assignee") ?? "");
+    }
+    void loadTask();
+  }, [taskId]);
 
   const assignTask = async (selectedRecipients: RecipientAccount[]) => {
     if (!selectedRecipients.length) return;
@@ -183,7 +195,7 @@ export default function TaskDetail({ taskId }: { taskId: string }) {
     }
   };
 
-  if (loading) return <div className="dashboard-loading"><span className="loading-spinner" /><p>Đang tải bài tập…</p></div>;
+  if (loading) return <div className="dashboard-loading"><BoxesLoader /><p>Đang tải bài tập…</p></div>;
   if (!task) return <main className="task-detail-page"><div className="task-detail-error"><h1>Không mở được bài tập</h1><p>{error || "Không tìm thấy bài tập."}</p><Link href="/tasks">Về danh sách bài tập</Link></div></main>;
 
   const isCreator = viewerRole === "creator";
@@ -195,16 +207,11 @@ export default function TaskDetail({ taskId }: { taskId: string }) {
     <header className="dashboard-topbar">
       <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
         <Link className="dashboard-brand" href="/"><Image src="/erd-draw-logo.png" alt="ERD Draw" width={144} height={96} priority unoptimized /></Link>
-        <nav className="dashboard-topnav">
-          <Link className="topnav-tab" href="/">📁 Sơ đồ của tôi</Link>
-          <Link className="topnav-tab active" href="/tasks">📝 Bài tập</Link>
-          <Link className="topnav-tab" href="/code-tasks">💻 Code bài tập</Link>
-          <Link className="topnav-tab" href="/closure">🔑 Tìm siêu khóa</Link>
-          <span className="topnav-breadcrumb">› Chi tiết</span>
-        </nav>
+        <TopNavGlass active="tasks" showActivity={isActivityAdminEmail(account?.email)} breadcrumb="Chi tiết" />
       </div>
       <div className="dashboard-user">
-        <div className="user-avatar">{(account?.name || account?.email || "U").slice(0, 1).toUpperCase()}</div>
+        <ThemeToggle />
+        <AccountAvatarButton account={account} onUpdated={(image) => setAccount((prev) => (prev ? { ...prev, image } : prev))} />
         <div className="user-details"><strong>{account?.name || "Tài khoản"}</strong><span>{account?.email}</span></div>
         <button type="button" onClick={() => void signOut({ callbackUrl: "/login" })}>Đăng xuất</button>
       </div>
@@ -212,7 +219,14 @@ export default function TaskDetail({ taskId }: { taskId: string }) {
 
     <section className="task-detail-content">
       <div className="task-detail-top-nav">
-        <Link className="task-back-link" href="/tasks">← Quay lại danh sách bài tập</Link>
+        <Link
+          className="task-back-link"
+          href={returnAssignee ? `/tasks?scope=sent&assignee=${encodeURIComponent(returnAssignee)}` : "/tasks"}
+        >
+          {returnAssignee
+            ? `← Quay lại bài đã giao cho ${task.assignedToName || "người này"}`
+            : "← Quay lại danh sách bài tập"}
+        </Link>
         <span className={`task-state task-state-${state.tone}`}>
           <span className="task-state-dot" />
           {state.label}
@@ -291,7 +305,7 @@ export default function TaskDetail({ taskId }: { taskId: string }) {
           <section className="task-deliveries">
             <header>
               <div><span className="dashboard-eyebrow">CÁC LƯỢT ĐÃ GIAO</span><h2>{task.deliveries.length} lượt làm bài</h2></div>
-              <Link href="/tasks">Xem danh sách đã giao →</Link>
+              <Link href="/tasks?scope=sent">Xem danh sách đã giao →</Link>
             </header>
             <DueDateEditorCard
               currentDueAt={task.deliveries[0]?.dueAt ?? null}

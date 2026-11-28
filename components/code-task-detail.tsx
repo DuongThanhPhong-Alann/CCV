@@ -5,13 +5,19 @@ import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import AccountAvatarButton from "@/components/account-avatar-button";
+import BoxesLoader from "@/components/boxes-loader";
 import CodeEditorPane from "@/components/code-editor-pane";
+import ThemeToggle from "@/components/theme-toggle";
+import TopNavGlass from "@/components/top-nav-glass";
 import { DueDateAssignField, DueDateEditorCard, localDateTimeInputToIso } from "@/components/due-date-control";
 import CodePreviewFrame, {
   analyzeCodeInSandbox,
   evaluateCodeInSandbox,
 } from "@/components/code-preview-frame";
 import MultiRecipientPicker, { type RecipientAccount } from "@/components/multi-recipient-picker";
+import RunCodeOverlay from "@/components/run-code-overlay";
+import { isActivityAdminEmail } from "@/lib/activity-types";
 import { CRITERION_TYPE_LABELS, createCriterionId, EMPTY_CODE_BUNDLE } from "@/lib/code-grader";
 import { playSound } from "@/lib/sound-fx";
 import type {
@@ -24,7 +30,7 @@ import type {
 import { readJsonResponse } from "@/lib/read-json-response";
 
 type ViewerRole = "creator" | "assignee";
-type Account = { id: string; name: string | null; email: string | null };
+type Account = { id: string; name: string | null; email: string | null; image?: string | null };
 
 function formatDate(value?: string | null) {
   return value ? new Date(value).toLocaleString("vi-VN", { dateStyle: "medium", timeStyle: "short" }) : "—";
@@ -65,10 +71,14 @@ function CriterionListTable({
       {criteria.map((criterion, index) => {
         const res = resultMap.get(criterion.id);
         const stateClass = !res ? "is-pending" : res.passed ? "is-pass" : "is-fail";
+        const checkState = !res ? "is-pending" : res.passed ? "is-passed" : "is-failed";
         return (
           <div className={`code-criterion-result-row ${stateClass}`} key={criterion.id || index}>
-            <div className="criterion-status-badge">
-              {!res ? "○" : res.passed ? "✓" : "✕"}
+            <div
+              className={`criterion-check-3d ${checkState}`}
+              aria-label={!res ? "Chưa kiểm tra" : res.passed ? "Đạt tiêu chí" : "Chưa đạt tiêu chí"}
+            >
+              <div className="criterion-check-box" />
             </div>
             <div className="criterion-result-main">
               <div className="criterion-result-top">
@@ -105,6 +115,7 @@ export default function CodeTaskDetail({ taskId }: { taskId: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [returnAssignee, setReturnAssignee] = useState("");
 
   // Creator draft editing state
   const [draftTitle, setDraftTitle] = useState("");
@@ -218,6 +229,10 @@ export default function CodeTaskDetail({ taskId }: { taskId: string }) {
   };
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      setReturnAssignee(params.get("assignee") ?? "");
+    }
     void loadTask();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId]);
@@ -470,6 +485,7 @@ export default function CodeTaskDetail({ taskId }: { taskId: string }) {
       window.clearTimeout(autoSaveTimerRef.current);
       autoSaveTimerRef.current = null;
     }
+    const startedAt = Date.now();
     dirtyRef.current = false;
     setError("");
     setNotice("");
@@ -480,8 +496,6 @@ export default function CodeTaskDetail({ taskId }: { taskId: string }) {
 
     try {
       const result = await evaluateCodeInSandbox(snapshotCode, task.criteria, task.passThreshold);
-      setAutoGradeResult(result);
-      playSound(result.passed ? "pass" : "wrong");
 
       const response = await fetch(`/api/code-tasks/${taskId}`, {
         method: "PATCH",
@@ -499,6 +513,15 @@ export default function CodeTaskDetail({ taskId }: { taskId: string }) {
       }>(response);
       if (!response.ok) throw new Error(payload.error || "Không thể lưu kết quả chạy code.");
 
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < 900) {
+        await new Promise((resolve) => window.setTimeout(resolve, 900 - elapsed));
+      }
+
+      const finalGrade = payload.lastRun?.autoGrade ?? result;
+      setAutoGradeResult(finalGrade);
+      playSound(finalGrade.passed ? "pass" : "wrong");
+
       if (payload.lastRun) {
         setTask((prev) =>
           prev
@@ -510,7 +533,6 @@ export default function CodeTaskDetail({ taskId }: { taskId: string }) {
               }
             : prev,
         );
-        setAutoGradeResult(payload.lastRun.autoGrade);
         dirtyRef.current = false;
         setLastSavedLabel("Đã lưu & chấm tự động");
         const ptsText = `${payload.lastRun.autoGrade.earnedPoints}/${payload.lastRun.autoGrade.totalPoints} điểm`;
@@ -566,7 +588,7 @@ export default function CodeTaskDetail({ taskId }: { taskId: string }) {
   if (loading) {
     return (
       <div className="dashboard-loading">
-        <span className="loading-spinner" />
+        <BoxesLoader />
         <p>Đang tải bài tập code…</p>
       </div>
     );
@@ -608,16 +630,11 @@ export default function CodeTaskDetail({ taskId }: { taskId: string }) {
           <Link className="dashboard-brand" href="/">
             <Image src="/erd-draw-logo.png" alt="ERD Draw" width={144} height={96} priority unoptimized />
           </Link>
-          <nav className="dashboard-topnav">
-            <Link className="topnav-tab" href="/">📁 Sơ đồ của tôi</Link>
-            <Link className="topnav-tab" href="/tasks">📝 Bài tập</Link>
-            <Link className="topnav-tab active" href="/code-tasks">💻 Code bài tập</Link>
-            <Link className="topnav-tab" href="/closure">🔑 Tìm siêu khóa</Link>
-            <span className="topnav-breadcrumb">› Chi tiết</span>
-          </nav>
+          <TopNavGlass active="code-tasks" showActivity={isActivityAdminEmail(account?.email)} breadcrumb="Chi tiết" />
         </div>
         <div className="dashboard-user">
-          <div className="user-avatar">{(account?.name || account?.email || "U").slice(0, 1).toUpperCase()}</div>
+          <ThemeToggle />
+          <AccountAvatarButton account={account} onUpdated={(image) => setAccount((prev) => (prev ? { ...prev, image } : prev))} />
           <div className="user-details">
             <strong>{account?.name || "Tài khoản"}</strong>
             <span>{account?.email}</span>
@@ -628,7 +645,14 @@ export default function CodeTaskDetail({ taskId }: { taskId: string }) {
 
       <section className="task-detail-content code-detail-content">
         <div className="task-detail-top-nav">
-          <Link className="task-back-link" href="/code-tasks">← Quay lại danh sách bài tập code</Link>
+          <Link
+            className="task-back-link"
+            href={returnAssignee ? `/code-tasks?scope=sent&assignee=${encodeURIComponent(returnAssignee)}` : "/code-tasks"}
+          >
+            {returnAssignee
+              ? `← Quay lại bài đã giao cho ${task.assignedToName || "người này"}`
+              : "← Quay lại danh sách bài tập code"}
+          </Link>
           <span className={`task-state task-state-${state.tone}`}>
             <span className="task-state-dot" />
             {state.label}
@@ -960,7 +984,7 @@ export default function CodeTaskDetail({ taskId }: { taskId: string }) {
 
                   {draftGradeResult && (
                     <div style={{ marginTop: 16 }}>
-                      <h4 style={{ margin: "0 0 8px", fontSize: 12, color: "#0f172a" }}>
+                      <h4 style={{ margin: "0 0 8px", fontSize: 12, color: "var(--ink)" }}>
                         Kết quả kiểm tra thử đáp án mẫu:
                       </h4>
                       <CriterionListTable result={draftGradeResult} criteria={draftCriteria} />
@@ -1000,7 +1024,7 @@ export default function CodeTaskDetail({ taskId }: { taskId: string }) {
                         {deliveries.length} lượt giao · {passedDeliveriesCount}/{deliveries.length} đã Pass
                       </h2>
                     </div>
-                    <Link href="/code-tasks">Xem tất cả bài đã giao →</Link>
+                    <Link href="/code-tasks?scope=sent">Xem tất cả bài đã giao →</Link>
                   </header>
                   <DueDateEditorCard
                     currentDueAt={deliveries[0]?.dueAt ?? null}
@@ -1109,6 +1133,7 @@ export default function CodeTaskDetail({ taskId }: { taskId: string }) {
           {/* ─── ASSIGNEE: WORKING VS CODE IDE ────────────────────── */}
           {!isCreator && task.status === "accepted" && (
             <section className="code-workspace-section">
+              <RunCodeOverlay visible={running} label="Đang chạy code & chấm điểm…" />
               <div className="code-workspace-bar">
                 <div className="code-workspace-score">
                   {autoGradeResult ? (
@@ -1131,27 +1156,30 @@ export default function CodeTaskDetail({ taskId }: { taskId: string }) {
                 <div className="code-workspace-buttons">
                   <button
                     type="button"
-                    className="code-secondary-button"
+                    className="code-kbd-btn btn-white"
                     disabled={busy || running}
                     onClick={resetStarterCode}
                   >
-                    ↺ Khôi phục mẫu
+                    <span className="btn-txt">Khôi phục mẫu</span>
+                    <kbd className="btn-kbd">↺</kbd>
                   </button>
                   <button
                     type="button"
-                    className="code-secondary-button"
+                    className="code-kbd-btn btn-green"
                     disabled={busy || savingCode}
                     onClick={() => void saveStudentCode(false)}
                   >
-                    {savingCode ? "Đang lưu…" : "💾 Lưu code"}
+                    <span className="btn-txt">{savingCode ? "Đang lưu…" : "Lưu code"}</span>
+                    <kbd className="btn-kbd">Ctrl+S</kbd>
                   </button>
                   <button
                     type="button"
-                    className="code-run-button"
+                    className="code-kbd-btn btn-blue"
                     disabled={busy || running}
                     onClick={() => void triggerRun()}
                   >
-                    {running ? "Đang chạy & chấm…" : "▶ Run Code"}
+                    <span className="btn-txt">{running ? "Đang chạy & chấm…" : "Run Code"}</span>
+                    <kbd className="btn-kbd">Ctrl+↵</kbd>
                   </button>
                 </div>
               </div>

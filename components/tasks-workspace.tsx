@@ -5,16 +5,64 @@ import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
+import AccountAvatarButton from "@/components/account-avatar-button";
 import BatchDraftAssignBar from "@/components/batch-draft-assign-bar";
+import BoxesLoader from "@/components/boxes-loader";
+import IosCheckbox from "@/components/ios-checkbox";
 import MailActionsBar from "@/components/mail-actions-bar";
+import TaskPedestalIcon, { type PedestalTone } from "@/components/task-pedestal-icon";
+import ThemeToggle from "@/components/theme-toggle";
+import TopNavGlass from "@/components/top-nav-glass";
+import { isActivityAdminEmail } from "@/lib/activity-types";
+import { resolveUserAvatar } from "@/lib/avatars";
 import { readJsonResponse } from "@/lib/read-json-response";
 import type { AssignmentTask } from "@/lib/task-types";
 
 type TaskScope = "received" | "drafts" | "sent";
-type Account = { id: string; name: string | null; email: string | null };
+type Account = { id: string; name: string | null; email: string | null; image?: string | null };
+type TaskAssigneeGroup = {
+  key: string;
+  name: string;
+  email: string;
+  image: string;
+  tasks: AssignmentTask[];
+  totalCount: number;
+  gradedCount: number;
+  submittedPendingCount: number;
+  activeCount: number;
+  invitedCount: number;
+  declinedCount: number;
+  submittedCount: number;
+  completionRate: number;
+  avgScore: number | null;
+  latestActivityAt: string;
+};
 
 function formatDate(value: string) {
   return new Date(value).toLocaleString("vi-VN", { dateStyle: "medium", timeStyle: "short" });
+}
+
+function getAssigneeKey(task: {
+  assignedToId: string | null;
+  assignedToName: string | null;
+  assignedToEmail: string | null;
+}) {
+  if (task.assignedToId) return `id:${task.assignedToId}`;
+  const email = (task.assignedToEmail ?? "").trim().toLowerCase();
+  if (email) return `email:${email}`;
+  const name = (task.assignedToName ?? "").trim().toLowerCase();
+  if (name) return `name:${name}`;
+  return "unassigned";
+}
+
+function erdTaskPedestalTone(task: AssignmentTask): PedestalTone {
+  if (task.status === "draft") return "slate";
+  if (task.submission && task.grade?.submissionVersion === task.submission.version) return "green";
+  if (task.status === "declined") return "red";
+  const isOverdue = Boolean(task.dueAt && new Date(task.dueAt).getTime() < Date.now());
+  if (isOverdue && !task.submission) return "red";
+  if (task.status === "invited") return "gold";
+  return "blue";
 }
 
 function taskState(task: AssignmentTask, scope: TaskScope) {
@@ -28,6 +76,107 @@ function taskState(task: AssignmentTask, scope: TaskScope) {
   return { label: "Đang thực hiện", tone: "active" };
 }
 
+function buildTaskAssigneeGroups(tasks: AssignmentTask[]): TaskAssigneeGroup[] {
+  const map = new Map<string, AssignmentTask[]>();
+  for (const task of tasks) {
+    const key = getAssigneeKey(task);
+    const list = map.get(key) ?? [];
+    list.push(task);
+    map.set(key, list);
+  }
+
+  return Array.from(map.entries())
+    .map(([key, groupTasks]) => {
+      const sample = groupTasks[0];
+      const name =
+        groupTasks.find((t) => t.assignedToName?.trim())?.assignedToName?.trim() ||
+        sample.assignedToEmail?.trim() ||
+        "Chưa xác định";
+      const email =
+        groupTasks.find((t) => t.assignedToEmail?.trim())?.assignedToEmail?.trim() || "—";
+      const image = resolveUserAvatar({
+        id: sample.assignedToId,
+        email: email === "—" ? null : email,
+        name,
+        image: groupTasks.find((t) => t.assignedToImage)?.assignedToImage,
+      });
+
+      let gradedCount = 0;
+      let submittedPendingCount = 0;
+      let activeCount = 0;
+      let invitedCount = 0;
+      let declinedCount = 0;
+      let scoreSum = 0;
+      let latestActivityAt = sample.submission?.submittedAt || sample.updatedAt;
+
+      for (const task of groupTasks) {
+        const activity = task.submission?.submittedAt || task.updatedAt;
+        if (new Date(activity).getTime() > new Date(latestActivityAt).getTime()) {
+          latestActivityAt = activity;
+        }
+        if (task.status === "declined") {
+          declinedCount += 1;
+        } else if (task.status === "invited") {
+          invitedCount += 1;
+        } else if (task.submission && task.grade?.submissionVersion === task.submission.version) {
+          gradedCount += 1;
+          scoreSum += task.grade.score;
+        } else if (task.submission) {
+          submittedPendingCount += 1;
+        } else {
+          activeCount += 1;
+        }
+      }
+
+      const totalCount = groupTasks.length;
+      const submittedCount = gradedCount + submittedPendingCount;
+      const completionRate = totalCount > 0 ? Math.round((submittedCount / totalCount) * 100) : 0;
+      const avgScore = gradedCount > 0 ? Math.round((scoreSum / gradedCount) * 10) / 10 : null;
+
+      return {
+        key,
+        name,
+        email,
+        image,
+        tasks: groupTasks,
+        totalCount,
+        gradedCount,
+        submittedPendingCount,
+        activeCount,
+        invitedCount,
+        declinedCount,
+        submittedCount,
+        completionRate,
+        avgScore,
+        latestActivityAt,
+      };
+    })
+    .sort((a, b) => {
+      const diff = new Date(b.latestActivityAt).getTime() - new Date(a.latestActivityAt).getTime();
+      if (diff !== 0) return diff;
+      return a.name.localeCompare(b.name, "vi");
+    });
+}
+
+function assigneeSummaryState(group: TaskAssigneeGroup) {
+  if (group.totalCount > 0 && group.gradedCount === group.totalCount) {
+    return { label: `Hoàn thành · ${group.gradedCount}/${group.totalCount} đã chấm`, tone: "graded" as const };
+  }
+  if (group.submittedPendingCount > 0) {
+    return { label: `Chờ chấm · ${group.submittedPendingCount} bài đã nộp`, tone: "submitted" as const };
+  }
+  if (group.gradedCount > 0) {
+    return { label: `Đã chấm ${group.gradedCount}/${group.totalCount} bài`, tone: "graded" as const };
+  }
+  if (group.activeCount > 0) {
+    return { label: `Đang thực hiện · ${group.activeCount} bài`, tone: "active" as const };
+  }
+  if (group.invitedCount > 0) {
+    return { label: `Chờ phản hồi · ${group.invitedCount} bài`, tone: "waiting" as const };
+  }
+  return { label: "Đã từ chối", tone: "declined" as const };
+}
+
 export default function TasksWorkspace() {
   const router = useRouter();
   const [account, setAccount] = useState<Account | null>(null);
@@ -39,10 +188,42 @@ export default function TasksWorkspace() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [selectedDraftIds, setSelectedDraftIds] = useState<string[]>([]);
+  const [selectedAssigneeKey, setSelectedAssigneeKey] = useState<string | null>(null);
+  const [assigneeQuery, setAssigneeQuery] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+
+  const syncUrl = (nextScope: TaskScope, nextAssigneeKey: string | null) => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams();
+    if (nextScope === "sent") {
+      params.set("scope", "sent");
+      if (nextAssigneeKey) params.set("assignee", nextAssigneeKey);
+    } else if (nextScope === "drafts") {
+      params.set("scope", "drafts");
+    }
+    const query = params.toString();
+    window.history.replaceState(null, "", query ? `/tasks?${query}` : "/tasks");
+  };
+
+  const switchScope = (nextScope: TaskScope) => {
+    setScope(nextScope);
+    setSelectedAssigneeKey(null);
+    setAssigneeQuery("");
+    syncUrl(nextScope, null);
+  };
+
+  const openAssignee = (assigneeKey: string) => {
+    setSelectedAssigneeKey(assigneeKey);
+    syncUrl("sent", assigneeKey);
+  };
+
+  const backToAssignees = () => {
+    setSelectedAssigneeKey(null);
+    syncUrl("sent", null);
+  };
 
   const loadTasks = async () => {
     setLoading(true);
@@ -67,7 +248,20 @@ export default function TasksWorkspace() {
     }
   };
 
-  useEffect(() => { void loadTasks(); }, []);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const paramScope = params.get("scope");
+      const paramAssignee = params.get("assignee");
+      if (paramScope === "received" || paramScope === "drafts" || paramScope === "sent") {
+        setScope(paramScope);
+        if (paramScope === "sent" && paramAssignee) {
+          setSelectedAssigneeKey(paramAssignee);
+        }
+      }
+    }
+    void loadTasks();
+  }, []);
 
   const createTask = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -84,7 +278,7 @@ export default function TasksWorkspace() {
       setShowCreate(false);
       setTitle("");
       setDescription("");
-      setScope("drafts");
+      switchScope("drafts");
       await loadTasks();
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "Không thể lưu đề bài.");
@@ -93,23 +287,42 @@ export default function TasksWorkspace() {
     }
   };
 
-  const items = scope === "received" ? received : scope === "drafts" ? drafts : sent;
+  const assigneeGroups = buildTaskAssigneeGroups(sent);
+  const selectedAssignee =
+    scope === "sent" && selectedAssigneeKey
+      ? assigneeGroups.find((group) => group.key === selectedAssigneeKey) ?? null
+      : null;
+  const showAssigneeDirectory = scope === "sent" && !selectedAssignee;
 
-  if (loading) return <div className="dashboard-loading"><span className="loading-spinner" /><p>Đang tải bài tập…</p></div>;
+  const normalizedAssigneeQuery = assigneeQuery.trim().toLowerCase();
+  const filteredAssigneeGroups = normalizedAssigneeQuery
+    ? assigneeGroups.filter(
+        (group) =>
+          group.name.toLowerCase().includes(normalizedAssigneeQuery) ||
+          group.email.toLowerCase().includes(normalizedAssigneeQuery),
+      )
+    : assigneeGroups;
+
+  const items =
+    scope === "received"
+      ? received
+      : scope === "drafts"
+        ? drafts
+        : selectedAssignee
+          ? selectedAssignee.tasks
+          : [];
+
+  if (loading) return <div className="dashboard-loading"><BoxesLoader /><p>Đang tải bài tập…</p></div>;
 
   return <main className="tasks-page">
     <header className="dashboard-topbar">
       <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
         <Link className="dashboard-brand" href="/"><Image src="/erd-draw-logo.png" alt="ERD Draw" width={144} height={96} priority unoptimized /></Link>
-        <nav className="dashboard-topnav">
-          <Link className="topnav-tab" href="/">📁 Sơ đồ của tôi</Link>
-          <Link className="topnav-tab active" href="/tasks">📝 Bài tập</Link>
-          <Link className="topnav-tab" href="/code-tasks">💻 Code bài tập</Link>
-          <Link className="topnav-tab" href="/closure">🔑 Tìm siêu khóa</Link>
-        </nav>
+        <TopNavGlass active="tasks" showActivity={isActivityAdminEmail(account?.email)} />
       </div>
       <div className="dashboard-user">
-        <div className="user-avatar">{(account?.name || account?.email || "U").slice(0, 1).toUpperCase()}</div>
+        <ThemeToggle />
+        <AccountAvatarButton account={account} onUpdated={(image) => setAccount((prev) => (prev ? { ...prev, image } : prev))} />
         <div className="user-details"><strong>{account?.name || "Tài khoản"}</strong><span>{account?.email}</span></div>
         <button type="button" onClick={() => void signOut({ callbackUrl: "/login" })}>Đăng xuất</button>
       </div>
@@ -131,16 +344,78 @@ export default function TasksWorkspace() {
       {notice && <div className="task-assignment-message" role="status"><span>{notice}</span><button type="button" onClick={() => setNotice("")}>Đóng</button></div>}
 
       <div className="task-tabs" role="tablist" aria-label="Danh sách bài tập">
-        <button className={scope === "received" ? "active" : ""} type="button" role="tab" aria-selected={scope === "received"} onClick={() => setScope("received")}>
+        <button className={scope === "received" ? "active" : ""} type="button" role="tab" aria-selected={scope === "received"} onClick={() => switchScope("received")}>
           📥 Được giao <span className="tab-counter">{received.length}</span>
         </button>
-        <button className={scope === "drafts" ? "active" : ""} type="button" role="tab" aria-selected={scope === "drafts"} onClick={() => setScope("drafts")}>
+        <button className={scope === "drafts" ? "active" : ""} type="button" role="tab" aria-selected={scope === "drafts"} onClick={() => switchScope("drafts")}>
           📝 Kho đề <span className="tab-counter">{drafts.length}</span>
         </button>
-        <button className={scope === "sent" ? "active" : ""} type="button" role="tab" aria-selected={scope === "sent"} onClick={() => setScope("sent")}>
+        <button className={scope === "sent" ? "active" : ""} type="button" role="tab" aria-selected={scope === "sent"} onClick={() => switchScope("sent")}>
           📤 Đã giao <span className="tab-counter">{sent.length}</span>
         </button>
       </div>
+
+      {scope === "sent" && selectedAssignee && (
+        <section className="selected-assignee-header">
+          <div className="selected-assignee-top">
+            <button
+              type="button"
+              className="task-back-link assignee-back-btn"
+              onClick={backToAssignees}
+            >
+              ← Quay lại danh sách người được giao
+            </button>
+            <span className="selected-assignee-count">
+              Đang xem {selectedAssignee.totalCount} bài đã giao
+            </span>
+          </div>
+          <div className="selected-assignee-profile">
+            <div className={`assignee-avatar assignee-avatar-${assigneeSummaryState(selectedAssignee).tone} has-photo`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={selectedAssignee.image} alt={selectedAssignee.name} className="avatar-img" />
+            </div>
+            <div className="selected-assignee-info">
+              <div className="selected-assignee-name-row">
+                <h2>{selectedAssignee.name}</h2>
+                <span className={`task-state task-state-${assigneeSummaryState(selectedAssignee).tone}`}>
+                  <span className="task-state-dot" />
+                  {assigneeSummaryState(selectedAssignee).label}
+                </span>
+              </div>
+              <p className="task-person-meta">{selectedAssignee.email}</p>
+              <div className="task-card-meta-row">
+                <span className="assignee-count-pill">📚 {selectedAssignee.totalCount} bài đã giao</span>
+                <span className={`code-progress-pill ${selectedAssignee.submittedCount > 0 ? "is-pass" : "is-fail"}`}>
+                  📄 {selectedAssignee.submittedCount}/{selectedAssignee.totalCount} đã nộp ({selectedAssignee.completionRate}%)
+                </span>
+                {selectedAssignee.gradedCount > 0 && (
+                  <span className="task-grade-pill">
+                    ✅ {selectedAssignee.gradedCount} đã chấm{selectedAssignee.avgScore !== null ? ` · ⭐️ TB ${selectedAssignee.avgScore}/10` : ""}
+                  </span>
+                )}
+                {selectedAssignee.submittedPendingCount > 0 && (
+                  <span className="task-sub-count">📝 {selectedAssignee.submittedPendingCount} chờ chấm</span>
+                )}
+                {selectedAssignee.activeCount > 0 && (
+                  <span className="assignee-stat-pill">✏️ {selectedAssignee.activeCount} đang làm</span>
+                )}
+                {selectedAssignee.invitedCount > 0 && (
+                  <span className="due-pill">⏳ {selectedAssignee.invitedCount} chờ phản hồi</span>
+                )}
+                {selectedAssignee.declinedCount > 0 && (
+                  <span className="assignee-stat-declined">✕ {selectedAssignee.declinedCount} từ chối</span>
+                )}
+              </div>
+              <div className="code-mini-bar-track" aria-hidden="true">
+                <div
+                  className={`code-mini-bar-fill ${selectedAssignee.submittedCount === selectedAssignee.totalCount && selectedAssignee.totalCount > 0 ? "is-pass" : "is-fail"}`}
+                  style={{ width: `${selectedAssignee.completionRate}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {scope === "drafts" && (
         <BatchDraftAssignBar
@@ -156,25 +431,142 @@ export default function TasksWorkspace() {
         />
       )}
 
-      {scope === "sent" && sent.length > 0 && (
+      {showAssigneeDirectory && sent.length > 0 && (
         <MailActionsBar onSuccess={setNotice} onError={setError} />
       )}
 
-      {items.length ? (
+      {showAssigneeDirectory ? (
+        sent.length > 0 ? (
+          <div className="assignee-directory">
+            <div className="assignee-directory-bar">
+              <div className="assignee-directory-heading">
+                <div className="assignee-directory-title-row">
+                  <h2>👥 Danh sách người được giao</h2>
+                  <span className="assignee-directory-badge">
+                    {assigneeGroups.length} người · {sent.length} bài đã giao
+                  </span>
+                </div>
+                <p>Nhấn vào từng người để xem danh sách bài tập ERD đã giao cho người đó.</p>
+              </div>
+              {assigneeGroups.length > 1 && (
+                <div className="assignee-search-box">
+                  <input
+                    type="search"
+                    value={assigneeQuery}
+                    onChange={(event) => setAssigneeQuery(event.target.value)}
+                    placeholder="Tìm theo tên hoặc email…"
+                    aria-label="Tìm người được giao"
+                  />
+                </div>
+              )}
+            </div>
+
+            {filteredAssigneeGroups.length > 0 ? (
+              <div className="task-list">
+                {filteredAssigneeGroups.map((group) => {
+                  const summary = assigneeSummaryState(group);
+                  return (
+                    <button
+                      type="button"
+                      key={group.key}
+                      className={`task-list-card assignee-card task-card-${summary.tone}`}
+                      onClick={() => openAssignee(group.key)}
+                    >
+                      <div className={`assignee-avatar assignee-avatar-${summary.tone} has-photo`}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={group.image} alt={group.name} className="avatar-img" loading="lazy" />
+                      </div>
+                      <div className="task-list-main">
+                        <div className="task-list-title">
+                          <h2>{group.name}</h2>
+                          <span className={`task-state task-state-${summary.tone}`}>
+                            <span className="task-state-dot" />
+                            {summary.label}
+                          </span>
+                        </div>
+                        <p className="task-person-meta">{group.email}</p>
+                        <div className="task-card-meta-row">
+                          <span className="assignee-count-pill">📚 {group.totalCount} bài đã giao</span>
+                          <span className={`code-progress-pill ${group.submittedCount > 0 ? "is-pass" : "is-fail"}`}>
+                            📄 {group.submittedCount}/{group.totalCount} đã nộp
+                          </span>
+                          {group.gradedCount > 0 && (
+                            <span className="task-grade-pill">
+                              ✅ {group.gradedCount} đã chấm{group.avgScore !== null ? ` · ⭐️ TB ${group.avgScore}/10` : ""}
+                            </span>
+                          )}
+                          {group.submittedPendingCount > 0 && (
+                            <span className="task-sub-count">📝 {group.submittedPendingCount} chờ chấm</span>
+                          )}
+                          {group.activeCount > 0 && (
+                            <span className="assignee-stat-pill">✏️ {group.activeCount} đang làm</span>
+                          )}
+                          {group.invitedCount > 0 && (
+                            <span className="due-pill">⏳ {group.invitedCount} chờ phản hồi</span>
+                          )}
+                          {group.declinedCount > 0 && (
+                            <span className="assignee-stat-declined">✕ {group.declinedCount} từ chối</span>
+                          )}
+                          <span className="task-list-date">
+                            🕒 Cập nhật gần nhất: {formatDate(group.latestActivityAt)}
+                          </span>
+                        </div>
+                        <div className="code-mini-bar-track" aria-hidden="true">
+                          <div
+                            className={`code-mini-bar-fill ${group.submittedCount === group.totalCount && group.totalCount > 0 ? "is-pass" : "is-fail"}`}
+                            style={{ width: `${group.completionRate}%` }}
+                          />
+                        </div>
+                      </div>
+                      <span className="task-list-arrow">›</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <section className="tasks-empty assignee-search-empty">
+                <div className="tasks-empty-icon">🔍</div>
+                <h2>Không tìm thấy người được giao phù hợp</h2>
+                <p>Không có học viên nào khớp với từ khóa “{assigneeQuery.trim()}”.</p>
+                <button
+                  type="button"
+                  className="code-secondary-button"
+                  onClick={() => setAssigneeQuery("")}
+                >
+                  Xóa từ khóa tìm kiếm
+                </button>
+              </section>
+            )}
+          </div>
+        ) : (
+          <section className="tasks-empty">
+            <div className="tasks-empty-icon">📤</div>
+            <h2>Bạn chưa giao bài tập nào</h2>
+            <p>Các người được giao và danh sách bài tập của từng người sẽ hiển thị tại đây.</p>
+            <button className="create-diagram-button" type="button" onClick={() => setShowCreate(true)}>
+              ＋ Tạo đề bài ngay
+            </button>
+          </section>
+        )
+      ) : items.length ? (
         <div className="task-list">
           {items.map((task) => {
             const state = taskState(task, scope);
+            const pedestalTone = erdTaskPedestalTone(task);
             const personLabel = scope === "received"
               ? `Người giao: ${task.createdByName} (${task.createdByEmail})`
               : scope === "drafts"
                 ? "Kho đề bài · Có thể giao nhiều lần"
                 : `Người nhận: ${task.assignedToName || "Chưa có"} (${task.assignedToEmail || "—"})`;
-            const icon = scope === "received" ? "📥" : scope === "drafts" ? "📝" : "📤";
             const isSelected = scope === "drafts" && selectedDraftIds.includes(task.id);
+            const taskHref =
+              scope === "sent" && selectedAssignee
+                ? `/tasks/${task.id}?assignee=${encodeURIComponent(selectedAssignee.key)}`
+                : `/tasks/${task.id}`;
 
             const card = (
-              <Link className={`task-list-card task-card-${state.tone} ${isSelected ? "is-selected-card" : ""}`} href={`/tasks/${task.id}`} key={task.id}>
-                <div className={`task-list-icon task-icon-${state.tone}`}>{icon}</div>
+              <Link className={`task-list-card task-card-${state.tone} ${isSelected ? "is-selected-card" : ""}`} href={taskHref} key={task.id}>
+                <TaskPedestalIcon tone={pedestalTone} />
                 <div className="task-list-main">
                   <div className="task-list-title">
                     <h2>{task.title}</h2>
@@ -209,9 +601,9 @@ export default function TasksWorkspace() {
             return (
               <div className={`task-select-row ${isSelected ? "is-selected" : ""}`} key={task.id}>
                 <label className="task-select-check" title="Chọn đề này để giao">
-                  <input
-                    type="checkbox"
+                  <IosCheckbox
                     checked={isSelected}
+                    ariaLabel={`Chọn đề ${task.title}`}
                     onChange={() =>
                       setSelectedDraftIds((prev) =>
                         prev.includes(task.id) ? prev.filter((id) => id !== task.id) : [...prev, task.id],

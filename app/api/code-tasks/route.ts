@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { ObjectId } from "mongodb";
 import { listAppDocuments, writeAppDocument, type AppDocument } from "@/lib/app-data";
 import { authOptions } from "@/lib/auth-options";
+import { resolveUserAvatar } from "@/lib/avatars";
 import { sanitizeCodeBundle, sanitizeCriteria } from "@/lib/code-grader";
 import type {
   CodeAutoGradeResult,
@@ -122,6 +123,27 @@ export async function GET() {
     const sent = created.filter((task) => task.status !== "draft");
     const drafts = created.filter((task) => task.status === "draft");
 
+    const userAvatarById = new Map<string, string>();
+    if (sent.length > 0) {
+      try {
+        const usersRaw = await listAppDocuments<AppDocument & { name?: string; email?: string; image?: string | null }>(
+          "users",
+          {},
+          () => getDatabase().collection("users").find({}, { projection: { _id: 1, name: 1, email: 1, image: 1 } }).toArray(),
+          2000,
+        );
+        for (const u of usersRaw) {
+          const uid = u._id.toString();
+          userAvatarById.set(
+            uid,
+            resolveUserAvatar({ id: uid, email: u.email, name: u.name, image: u.image }),
+          );
+        }
+      } catch {
+        // fall back to deterministic avatar resolution
+      }
+    }
+
     const statsBySource = new Map<string, { assignedCount: number; passedCount: number }>();
     for (const task of sent) {
       if (!task.sourceTaskId) continue;
@@ -135,7 +157,17 @@ export async function GET() {
 
     return Response.json({
       received: received.map((task) => serializeCodeTaskSummary(task, false)),
-      sent: sent.map((task) => serializeCodeTaskSummary(task, true)),
+      sent: sent.map((task) => {
+        const serialized = serializeCodeTaskSummary(task, true);
+        const assignedToImage =
+          (serialized.assignedToId ? userAvatarById.get(serialized.assignedToId) : null) ??
+          resolveUserAvatar({
+            id: serialized.assignedToId,
+            email: serialized.assignedToEmail,
+            name: serialized.assignedToName,
+          });
+        return { ...serialized, assignedToImage };
+      }),
       drafts: drafts.map((task) => {
         const stat = statsBySource.get(task._id.toString()) ?? { assignedCount: 0, passedCount: 0 };
         return {

@@ -1,12 +1,16 @@
 import bcrypt from "bcryptjs";
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import { recordUserActivity } from "@/lib/activity-logger";
 import { listAppDocuments, type AppDocument } from "@/lib/app-data";
 import { getDatabase } from "@/lib/mongodb";
 
+export const SESSION_IDLE_TIMEOUT_SECONDS = 30 * 60;
+
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
-  session: { strategy: "jwt", maxAge: 7 * 24 * 60 * 60 },
+  session: { strategy: "jwt", maxAge: SESSION_IDLE_TIMEOUT_SECONDS },
+  jwt: { maxAge: SESSION_IDLE_TIMEOUT_SECONDS },
   pages: { signIn: "/login" },
   providers: [
     CredentialsProvider({
@@ -39,6 +43,30 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user && token.sub) session.user.id = token.sub;
       return session;
+    },
+  },
+  events: {
+    async signIn({ user }) {
+      if (user?.id) {
+        await recordUserActivity({
+          userId: user.id,
+          event: "login",
+          kind: "login",
+          path: "/login",
+          title: "Đăng nhập vào hệ thống",
+        });
+      }
+    },
+    async signOut({ token }) {
+      if (token?.sub) {
+        await recordUserActivity({
+          userId: token.sub,
+          event: "logout",
+          kind: "logout",
+          path: "/login",
+          reason: "logout",
+        });
+      }
     },
   },
 };

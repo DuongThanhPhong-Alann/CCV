@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import ActivityTracker from "@/components/activity-tracker";
 import GlobalSoundEffects from "@/components/global-sound-effects";
+import SessionIdleGuard from "@/components/session-idle-guard";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,11 +21,18 @@ export const metadata: Metadata = {
   },
 };
 
+const THEME_INIT_SCRIPT = `try{if(localStorage.getItem("ccv_theme")==="dark"){document.documentElement.dataset.theme="dark";}}catch(e){}`;
+
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="vi">
+    <html lang="vi" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body>
         {children}
+        <SessionIdleGuard />
+        <ActivityTracker />
         <GlobalSoundEffects />
       </body>
     </html>

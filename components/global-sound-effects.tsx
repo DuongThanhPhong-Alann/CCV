@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { isSoundMuted, playSound, preloadSounds, setSoundMuted } from "@/lib/sound-fx";
+import { useEffect } from "react";
+import { playSound, preloadSounds, setSoundMuted } from "@/lib/sound-fx";
 
 const INTERACTIVE_SELECTOR = [
   "button",
@@ -14,20 +14,9 @@ const INTERACTIVE_SELECTOR = [
 ].join(", ");
 
 export default function GlobalSoundEffects() {
-  const [muted, setMuted] = useState(false);
-
   useEffect(() => {
-    setMuted(isSoundMuted());
+    setSoundMuted(false);
     preloadSounds();
-
-    const handleMuteEvent = (ev: Event) => {
-      const detail = (ev as CustomEvent<{ muted?: boolean }>).detail;
-      if (typeof detail?.muted === "boolean") {
-        setMuted(detail.muted);
-      } else {
-        setMuted(isSoundMuted());
-      }
-    };
 
     const handlePointerDown = (ev: PointerEvent) => {
       if (ev.button === 2) return;
@@ -42,34 +31,11 @@ export default function GlobalSoundEffects() {
       playSound("click");
     };
 
-    window.addEventListener("ccv-sound-mute-change", handleMuteEvent);
     document.addEventListener("pointerdown", handlePointerDown, true);
     return () => {
-      window.removeEventListener("ccv-sound-mute-change", handleMuteEvent);
       document.removeEventListener("pointerdown", handlePointerDown, true);
     };
   }, []);
 
-  const toggleMute = () => {
-    const next = !muted;
-    setSoundMuted(next);
-    setMuted(next);
-    if (!next) {
-      playSound("click");
-    }
-  };
-
-  return (
-    <button
-      type="button"
-      data-no-click-sound="true"
-      className={`sound-toggle-fab ${muted ? "is-muted" : ""}`}
-      onClick={toggleMute}
-      title={muted ? "Bật hiệu ứng âm thanh" : "Tắt hiệu ứng âm thanh"}
-      aria-label={muted ? "Bật hiệu ứng âm thanh" : "Tắt hiệu ứng âm thanh"}
-    >
-      <span>{muted ? "🔇" : "🔊"}</span>
-      <span>{muted ? "Đã tắt tiếng" : "Âm thanh"}</span>
-    </button>
-  );
+  return null;
 }

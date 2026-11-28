@@ -291,8 +291,9 @@ async function readPrimaryList(collection: AppCollection, filters: AppFilters, l
       for (const row of [...(names.data ?? []), ...(emails.data ?? [])]) rows.set(row._id, row as RecordRow);
       return [...rows.values()].map(fromRow).sort((a, b) => String(a.name ?? "").localeCompare(String(b.name ?? ""))).slice(0, limit);
     }
+    const orderColumn = collection === "users" ? "createdAt" : "updatedAt";
     const { data, error } = await applyFilters(client.from(collection).select("_id,document,revision"), collection, filters)
-      .order("updatedAt", { ascending: false }).limit(limit);
+      .order(orderColumn, { ascending: false }).limit(limit);
     if (error) throw error;
     return (data ?? []).map((row: any) => fromRow(row as RecordRow));
   };

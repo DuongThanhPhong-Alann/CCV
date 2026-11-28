@@ -41,6 +41,7 @@ export type AssignmentTask = {
   assignedToId: string | null;
   assignedToName: string | null;
   assignedToEmail: string | null;
+  assignedToImage?: string | null;
   sourceTaskId?: string | null;
   assignedCount?: number;
   deliveries?: TaskDelivery[];

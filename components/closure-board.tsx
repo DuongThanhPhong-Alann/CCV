@@ -5,6 +5,11 @@ import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import AccountAvatarButton from "@/components/account-avatar-button";
+import BoxesLoader from "@/components/boxes-loader";
+import ThemeToggle from "@/components/theme-toggle";
+import TopNavGlass from "@/components/top-nav-glass";
+import { isActivityAdminEmail } from "@/lib/activity-types";
 import { readJsonResponse } from "@/lib/read-json-response";
 import {
   applySingleFDToSetText,
@@ -24,7 +29,7 @@ import {
   type ClosureBoardState,
 } from "@/lib/closure-solver";
 
-type Account = { id: string; name: string | null; email: string | null };
+type Account = { id: string; name: string | null; email: string | null; image?: string | null };
 
 const STORAGE_KEY = "erd_closure_board_v2";
 
@@ -320,7 +325,7 @@ export default function ClosureBoard() {
   if (loading) {
     return (
       <div className="dashboard-loading">
-        <span className="loading-spinner" />
+        <BoxesLoader />
         <p>Đang tải bảng giải bài tập…</p>
       </div>
     );
@@ -333,15 +338,11 @@ export default function ClosureBoard() {
           <Link className="dashboard-brand" href="/">
             <Image src="/erd-draw-logo.png" alt="ERD Draw" width={144} height={96} priority unoptimized />
           </Link>
-          <nav className="dashboard-topnav">
-            <Link className="topnav-tab" href="/">📁 Sơ đồ của tôi</Link>
-            <Link className="topnav-tab" href="/tasks">📝 Bài tập</Link>
-            <Link className="topnav-tab" href="/code-tasks">💻 Code bài tập</Link>
-            <Link className="topnav-tab active" href="/closure">🔑 Tìm siêu khóa</Link>
-          </nav>
+          <TopNavGlass active="closure" showActivity={isActivityAdminEmail(account?.email)} />
         </div>
         <div className="dashboard-user">
-          <div className="user-avatar">{(account?.name || account?.email || "U").slice(0, 1).toUpperCase()}</div>
+          <ThemeToggle />
+          <AccountAvatarButton account={account} onUpdated={(image) => setAccount((prev) => (prev ? { ...prev, image } : prev))} />
           <div className="user-details">
             <strong>{account?.name || "Tài khoản"}</strong>
             <span>{account?.email}</span>

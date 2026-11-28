@@ -5,9 +5,21 @@ import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
+import AccountAvatarButton from "@/components/account-avatar-button";
+import AuthCheckLoader from "@/components/auth-check-loader";
+import BoxesLoader from "@/components/boxes-loader";
+import ThemeToggle from "@/components/theme-toggle";
+import TopNavGlass from "@/components/top-nav-glass";
+import { isActivityAdminEmail } from "@/lib/activity-types";
 import { readJsonResponse } from "@/lib/read-json-response";
+import {
+  cacheAccountName,
+  clearPostLoginTransition,
+  hasRecentPostLoginTransition,
+  readPostLoginDisplayName,
+} from "@/lib/session-activity";
 
-type Account = { id: string; name: string | null; email: string | null };
+type Account = { id: string; name: string | null; email: string | null; image?: string | null };
 type DiagramSummary = { id: string; name: string; entityCount: number; relationCount: number; createdAt: string; updatedAt: string; taskId?: string | null };
 
 export default function DashboardPage() {
@@ -15,6 +27,8 @@ export default function DashboardPage() {
   const [account, setAccount] = useState<Account | null>(null);
   const [diagrams, setDiagrams] = useState<DiagramSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [postLoginLoading] = useState(() => hasRecentPostLoginTransition());
+  const [postLoginName] = useState(() => readPostLoginDisplayName());
   const [error, setError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
@@ -30,6 +44,7 @@ export default function DashboardPage() {
       if (!accountResponse.ok) throw new Error(accountResult.error || "Không thể kiểm tra tài khoản.");
       if (!accountResult.user) throw new Error("Máy chủ chưa trả về thông tin tài khoản.");
       setAccount(accountResult.user);
+      cacheAccountName(accountResult.user.email, accountResult.user.name);
 
       const diagramsResponse = await fetch("/api/diagrams", { cache: "no-store" });
       const diagramsResult = await readJsonResponse<{ error?: string; diagrams?: DiagramSummary[] }>(diagramsResponse);
@@ -38,6 +53,7 @@ export default function DashboardPage() {
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Không thể tải dữ liệu.");
     } finally {
+      clearPostLoginTransition();
       setLoading(false);
     }
   };
@@ -79,21 +95,31 @@ export default function DashboardPage() {
     }
   };
 
-  if (loading) return <div className="dashboard-loading"><span className="loading-spinner" /><p>Đang tải không gian làm việc…</p></div>;
+  if (loading) {
+    if (postLoginLoading) {
+      return (
+        <AuthCheckLoader
+          displayName={postLoginName}
+          message={
+            postLoginName
+              ? `Xin chào ${postLoginName}! Đang vào không gian làm việc…`
+              : "Đăng nhập thành công! Đang vào không gian làm việc…"
+          }
+        />
+      );
+    }
+    return <div className="dashboard-loading"><BoxesLoader /><p>Đang tải không gian làm việc…</p></div>;
+  }
 
   return <main className="dashboard-page">
     <header className="dashboard-topbar">
       <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
         <Link className="dashboard-brand" href="/"><Image src="/erd-draw-logo.png" alt="ERD Draw" width={144} height={96} priority unoptimized /></Link>
-        <nav className="dashboard-topnav">
-          <Link className="topnav-tab active" href="/">📁 Sơ đồ của tôi</Link>
-          <Link className="topnav-tab" href="/tasks">📝 Bài tập</Link>
-          <Link className="topnav-tab" href="/code-tasks">💻 Code bài tập</Link>
-          <Link className="topnav-tab" href="/closure">🔑 Tìm siêu khóa</Link>
-        </nav>
+        <TopNavGlass active="diagrams" showActivity={isActivityAdminEmail(account?.email)} />
       </div>
       <div className="dashboard-user">
-        <div className="user-avatar">{(account?.name || account?.email || "U").slice(0, 1).toUpperCase()}</div>
+        <ThemeToggle />
+        <AccountAvatarButton account={account} onUpdated={(image) => setAccount((prev) => (prev ? { ...prev, image } : prev))} />
         <div className="user-details"><strong>{account?.name || "Tài khoản"}</strong><span>{account?.email}</span></div>
         <button type="button" onClick={() => void signOut({ callbackUrl: "/login" })}>Đăng xuất</button>
       </div>
