@@ -68,12 +68,16 @@ function isErdTaskOverdueUnfinished(task: AssignmentTask): boolean {
   return isTaskOverdue(task.dueAt);
 }
 
+function isErdEffectivelyAccepted(task: AssignmentTask): boolean {
+  return task.status === "accepted" || Boolean(task.diagramId || task.submission || task.grade);
+}
+
 function erdTaskPedestalTone(task: AssignmentTask): PedestalTone {
   if (task.status === "draft") return "slate";
   if (task.submission && task.grade?.submissionVersion === task.submission.version) return "green";
   if (task.status === "declined") return "red";
   if (isErdTaskOverdueUnfinished(task)) return "red";
-  if (task.status === "invited") return "gold";
+  if (task.status === "invited" && !isErdEffectivelyAccepted(task)) return "gold";
   return "blue";
 }
 
@@ -83,11 +87,11 @@ function taskState(task: AssignmentTask, scope: TaskScope) {
   if (task.submission && task.grade?.submissionVersion === task.submission.version) return { label: "Đã chấm điểm", tone: "graded" };
   if (task.submission) return { label: "Đã nộp bài", tone: "submitted" };
   if (isErdTaskOverdueUnfinished(task)) {
-    return task.status === "invited"
+    return task.status === "invited" && !isErdEffectivelyAccepted(task)
       ? { label: "Quá hạn · Chưa nhận", tone: "overdue" }
       : { label: "Quá hạn · Chưa nộp", tone: "overdue" };
   }
-  if (task.status === "invited") return scope === "received"
+  if (task.status === "invited" && !isErdEffectivelyAccepted(task)) return scope === "received"
     ? { label: "Chờ bạn phản hồi", tone: "waiting" }
     : { label: "Đang chờ chấp nhận", tone: "waiting" };
   return { label: "Đang thực hiện", tone: "active" };
@@ -278,6 +282,42 @@ export default function TasksWorkspace() {
       }
     }
     void loadTasks();
+
+    const refreshQuietly = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const res = await fetch("/api/tasks", { cache: "no-store" });
+        if (!res.ok) return;
+        const result = await readJsonResponse<{
+          received?: AssignmentTask[];
+          sent?: AssignmentTask[];
+          drafts?: AssignmentTask[];
+        }>(res);
+        if (Array.isArray(result.received)) setReceived(result.received);
+        if (Array.isArray(result.sent)) setSent(result.sent);
+        if (Array.isArray(result.drafts)) setDrafts(result.drafts);
+      } catch {
+        // ignore transient refresh failures
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      void refreshQuietly();
+    }, 8_000);
+    const handleVisible = () => {
+      if (document.visibilityState === "visible") void refreshQuietly();
+    };
+    const handleFocus = () => {
+      void refreshQuietly();
+    };
+
+    document.addEventListener("visibilitychange", handleVisible);
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisible);
+      window.removeEventListener("focus", handleFocus);
+    };
   }, []);
 
   const createTask = async (event: FormEvent<HTMLFormElement>) => {

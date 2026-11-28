@@ -5,6 +5,7 @@ import { currentOwnerId } from "@/lib/current-user";
 import { isMailConfigured, sendDueDateUpdatedEmail, sendTaskGradedEmail, sendTasksAssignedEmail } from "@/lib/mailer";
 import { getDatabase } from "@/lib/mongodb";
 import { parseDueAtInput, resolveAssignRecipients } from "@/lib/task-assign";
+import { deduplicateTaskDeliveries } from "@/lib/task-dedupe";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -77,7 +78,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
     const task = await loadAuthorizedTask(id, ownerId);
     if (!task) return Response.json({ error: "Không tìm thấy bài tập." }, { status: 404 });
     const isCreator = task.createdById.equals(ownerId);
-    const deliveries = isCreator && task.status === "draft"
+    const deliveriesRaw = isCreator && task.status === "draft"
       ? await listAppDocuments<AssignmentDoc & AppDocument>("tasks", { sourceId: task._id.toString(), ownerId: ownerId.toString() }, () => getDatabase().collection<AssignmentDoc>("tasks")
           .find({ sourceTaskId: task._id, createdById: ownerId }, { projection: {
             title: 1, description: 1, createdById: 1, createdByName: 1, createdByEmail: 1,
@@ -86,6 +87,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
             "grade.score": 1, "grade.submissionVersion": 1, createdAt: 1, updatedAt: 1,
           } }).sort({ updatedAt: -1 }).toArray())
       : [];
+    const deliveries = deduplicateTaskDeliveries(deliveriesRaw);
     return Response.json({
       task: {
         ...serializeTask(task),
@@ -102,7 +104,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
         })),
       },
       viewerRole: isCreator ? "creator" : "assignee",
-    });
+    }, { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } });
   } catch {
     return Response.json({ error: "Không thể tải bài tập. Kiểm tra kết nối Supabase hoặc MongoDB." }, { status: 503 });
   }
@@ -159,10 +161,23 @@ export async function PATCH(request: Request, { params }: RouteContext) {
         return Response.json({ error: parsedDue.error }, { status: 400 });
       }
 
+      const existingDeliveries = await listAppDocuments<AssignmentDoc & AppDocument>(
+        "tasks",
+        { sourceId: taskId.toString(), ownerId: ownerId.toString() },
+        () => getDatabase().collection<AssignmentDoc>("tasks").find({ sourceTaskId: taskId, createdById: ownerId }).toArray(),
+      );
+      const alreadyActiveRecipientIds = new Set(
+        existingDeliveries
+          .filter((d) => d.status === "invited" || d.status === "accepted")
+          .map((d) => d.assignedToId?.toString())
+          .filter((v): v is string => Boolean(v)),
+      );
+
       const now = new Date();
       const createdIds: string[] = [];
       const mailPromises: Promise<{ sent: boolean }>[] = [];
       for (const recipient of resolved.recipients) {
+        if (alreadyActiveRecipientIds.has(recipient._id.toString())) continue;
         const assignmentId = new ObjectId();
         await writeAppDocument("tasks", {
           _id: assignmentId,
@@ -304,6 +319,15 @@ export async function PATCH(request: Request, { params }: RouteContext) {
         if (latest?.status === "accepted" && latest.diagramId) return Response.json({ ok: true, diagramId: latest.diagramId.toString() });
         return Response.json({ error: "Bài tập vừa được xử lý ở nơi khác. Hãy tải lại trang." }, { status: 409 });
       }
+      await recordUserActivity({
+        userId: ownerId.toString(),
+        event: "action",
+        kind: "erd_task",
+        path: `/tasks/${taskId.toString()}`,
+        targetId: taskId.toString(),
+        title: task.title,
+        note: "Đã chấp nhận bài tập ERD",
+      });
       return Response.json({ ok: true, diagramId: diagramId.toString() });
     }
 

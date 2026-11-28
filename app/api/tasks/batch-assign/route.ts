@@ -1,5 +1,5 @@
 import { ObjectId } from "mongodb";
-import { findAppDocument, writeAppDocument, type AppDocument } from "@/lib/app-data";
+import { findAppDocument, listAppDocuments, writeAppDocument, type AppDocument } from "@/lib/app-data";
 import { currentOwnerId } from "@/lib/current-user";
 import { isMailConfigured, sendTasksAssignedEmail } from "@/lib/mailer";
 import { getDatabase } from "@/lib/mongodb";
@@ -72,6 +72,19 @@ export async function POST(request: Request) {
       return Response.json({ error: "Không có đề bài ERD hợp lệ nào trong kho để giao." }, { status: 400 });
     }
 
+    const existingCreated = await listAppDocuments<
+      ErdTaskDoc & AppDocument & { sourceTaskId?: ObjectId; assignedToId?: ObjectId }
+    >(
+      "tasks",
+      { ownerId: ownerId.toString() },
+      () => tasksCol.find({ createdById: ownerId, status: { $ne: "draft" } }).toArray() as Promise<Array<ErdTaskDoc & AppDocument>>,
+    );
+    const activePairKeys = new Set(
+      existingCreated
+        .filter((d) => d.taskType !== "code" && (d.status === "invited" || d.status === "accepted") && d.sourceTaskId && d.assignedToId)
+        .map((d) => `${d.sourceTaskId!.toString()}::${d.assignedToId!.toString()}`),
+    );
+
     const now = new Date();
     const writes: Promise<unknown>[] = [];
     const recipientBatches = new Map<
@@ -87,6 +100,9 @@ export async function POST(request: Request) {
 
     for (const draft of validDrafts) {
       for (const recipient of resolved.recipients) {
+        const pairKey = `${draft._id.toString()}::${recipient._id.toString()}`;
+        if (activePairKeys.has(pairKey)) continue;
+        activePairKeys.add(pairKey);
         const assignmentId = new ObjectId();
         const assignmentIdStr = assignmentId.toString();
         writes.push(

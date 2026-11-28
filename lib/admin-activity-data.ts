@@ -9,6 +9,7 @@ import {
 import { listAppDocuments, type AppDocument } from "@/lib/app-data";
 import { resolveUserAvatar } from "@/lib/avatars";
 import { getDatabase } from "@/lib/mongodb";
+import { deduplicateTaskDeliveries } from "@/lib/task-dedupe";
 
 const ONLINE_WINDOW_MS = 3 * 60 * 1000;
 const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
@@ -79,7 +80,10 @@ export async function buildAdminActivitySnapshot(currentUserId: string): Promise
   ]);
 
   const tasksByAssignee = new Map<string, AdminUserTaskEvent[]>();
-  for (const task of tasksRaw) {
+  const dedupedTasks = deduplicateTaskDeliveries(
+    tasksRaw.filter((t) => t.status !== "draft" && Boolean(t.assignedToId)),
+  );
+  for (const task of dedupedTasks) {
     if (task.status === "draft" || !task.assignedToId) continue;
     const assigneeId = typeof task.assignedToId === "string" ? task.assignedToId : task.assignedToId.toString();
     const autoGrade = task.lastRun?.autoGrade ?? task.submission?.autoGrade ?? null;

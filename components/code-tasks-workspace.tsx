@@ -169,13 +169,17 @@ function isCodeTaskOverdueUnpassed(task: CodeTaskItem): boolean {
   return isTaskOverdue(task.dueAt);
 }
 
+function isCodeEffectivelyAccepted(task: CodeTaskItem): boolean {
+  return task.status === "accepted" || Boolean(task.lastRun || task.submission || task.grade);
+}
+
 function codeTaskPedestalTone(task: CodeTaskItem): PedestalTone {
   if (task.status === "draft") return "slate";
   const autoGrade = getLatestAutoGrade(task);
   if (autoGrade?.passed) return "green";
   if (task.status === "declined") return "red";
   if (isCodeTaskOverdueUnpassed(task)) return "red";
-  if (task.status === "invited") return "gold";
+  if (task.status === "invited" && !isCodeEffectivelyAccepted(task)) return "gold";
   return "blue";
 }
 
@@ -187,7 +191,7 @@ function codeTaskState(task: CodeTaskItem, scope: TaskScope) {
     return { label: `PASS · ${autoGrade.percentage}%`, tone: "graded" };
   }
   if (isCodeTaskOverdueUnpassed(task)) {
-    if (task.status === "invited") {
+    if (task.status === "invited" && !isCodeEffectivelyAccepted(task)) {
       return { label: "Quá hạn · Chưa nhận", tone: "overdue" };
     }
     if (autoGrade) {
@@ -195,7 +199,7 @@ function codeTaskState(task: CodeTaskItem, scope: TaskScope) {
     }
     return { label: "Quá hạn · Chưa pass", tone: "overdue" };
   }
-  if (task.status === "invited") {
+  if (task.status === "invited" && !isCodeEffectivelyAccepted(task)) {
     return scope === "received"
       ? { label: "Chờ bạn nhận bài", tone: "waiting" }
       : { label: "Đang chờ nhận", tone: "waiting" };
@@ -410,6 +414,42 @@ export default function CodeTasksWorkspace() {
       }
     }
     void loadTasks();
+
+    const refreshQuietly = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const res = await fetch("/api/code-tasks", { cache: "no-store" });
+        if (!res.ok) return;
+        const result = await readJsonResponse<{
+          received?: CodeTaskItem[];
+          sent?: CodeTaskItem[];
+          drafts?: CodeTaskItem[];
+        }>(res);
+        if (Array.isArray(result.received)) setReceived(result.received);
+        if (Array.isArray(result.sent)) setSent(result.sent);
+        if (Array.isArray(result.drafts)) setDrafts(result.drafts);
+      } catch {
+        // ignore transient refresh failures
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      void refreshQuietly();
+    }, 8_000);
+    const handleVisible = () => {
+      if (document.visibilityState === "visible") void refreshQuietly();
+    };
+    const handleFocus = () => {
+      void refreshQuietly();
+    };
+
+    document.addEventListener("visibilitychange", handleVisible);
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisible);
+      window.removeEventListener("focus", handleFocus);
+    };
   }, []);
 
   const assigneeGroups = buildCodeAssigneeGroups(sent);

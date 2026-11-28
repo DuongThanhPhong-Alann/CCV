@@ -13,6 +13,7 @@ import type {
 } from "@/lib/code-task-types";
 import { currentOwnerId } from "@/lib/current-user";
 import { getDatabase } from "@/lib/mongodb";
+import { deduplicateTaskDeliveries } from "@/lib/task-dedupe";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -118,9 +119,9 @@ export async function GET() {
       ),
     ]);
 
-    const received = receivedRaw.filter((task) => task.taskType === "code");
+    const received = deduplicateTaskDeliveries(receivedRaw.filter((task) => task.taskType === "code"));
     const created = createdRaw.filter((task) => task.taskType === "code");
-    const sent = created.filter((task) => task.status !== "draft");
+    const sent = deduplicateTaskDeliveries(created.filter((task) => task.status !== "draft"));
     const drafts = created.filter((task) => task.status === "draft");
 
     const userAvatarById = new Map<string, string>();
@@ -176,7 +177,7 @@ export async function GET() {
           passedDeliveryCount: stat.passedCount,
         };
       }),
-    });
+    }, { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } });
   } catch {
     return Response.json({ error: "Không thể tải danh sách bài tập code." }, { status: 503 });
   }

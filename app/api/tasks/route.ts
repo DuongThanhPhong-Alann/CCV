@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth-options";
 import { resolveUserAvatar } from "@/lib/avatars";
 import { currentOwnerId } from "@/lib/current-user";
 import { getDatabase } from "@/lib/mongodb";
+import { deduplicateTaskDeliveries } from "@/lib/task-dedupe";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -70,9 +71,9 @@ export async function GET() {
       listAppDocuments<AssignmentDoc & AppDocument>("tasks", { assignedToId: ownerId.toString() }, () => tasks.find({ assignedToId: ownerId }, { projection: summaryProjection }).sort({ updatedAt: -1 }).toArray()),
       listAppDocuments<AssignmentDoc & AppDocument>("tasks", { ownerId: ownerId.toString() }, () => tasks.find({ createdById: ownerId }, { projection: summaryProjection }).sort({ updatedAt: -1 }).toArray()),
     ]);
-    const received = receivedRaw.filter((task) => task.taskType !== "code");
+    const received = deduplicateTaskDeliveries(receivedRaw.filter((task) => task.taskType !== "code"));
     const created = createdRaw.filter((task) => task.taskType !== "code");
-    const sent = created.filter((task) => task.status !== "draft");
+    const sent = deduplicateTaskDeliveries(created.filter((task) => task.status !== "draft"));
     const drafts = created.filter((task) => task.status === "draft");
 
     const userAvatarById = new Map<string, string>();
@@ -117,7 +118,7 @@ export async function GET() {
         return { ...serialized, assignedToImage };
       }),
       drafts: drafts.map((task) => ({ ...serializeTask(task), assignedCount: countsByTaskId.get(task._id.toString()) ?? 0 })),
-    });
+    }, { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } });
   } catch {
     return Response.json({ error: "Không thể tải bài tập. Kiểm tra kết nối Supabase hoặc MongoDB." }, { status: 503 });
   }

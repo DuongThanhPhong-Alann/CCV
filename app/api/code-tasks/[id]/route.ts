@@ -27,6 +27,7 @@ import {
 } from "@/lib/mailer";
 import { getDatabase } from "@/lib/mongodb";
 import { parseDueAtInput, resolveAssignRecipients } from "@/lib/task-assign";
+import { deduplicateTaskDeliveries } from "@/lib/task-dedupe";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -183,7 +184,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
               .toArray(),
         )
       : [];
-    const deliveries = deliveriesRaw.filter((item) => item.taskType === "code");
+    const deliveries = deduplicateTaskDeliveries(deliveriesRaw.filter((item) => item.taskType === "code"));
 
     return Response.json({
       task: {
@@ -230,7 +231,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
         })),
       },
       viewerRole: isCreator ? "creator" : "assignee",
-    });
+    }, { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } });
   } catch {
     return Response.json({ error: "Không thể tải bài tập code." }, { status: 503 });
   }
@@ -340,10 +341,23 @@ export async function PATCH(request: Request, { params }: RouteContext) {
         return Response.json({ error: parsedDue.error }, { status: 400 });
       }
 
+      const existingDeliveries = await listAppDocuments<CodeTaskDoc & AppDocument>(
+        "tasks",
+        { sourceId: taskId.toString(), ownerId: ownerId.toString() },
+        () => getDatabase().collection<CodeTaskDoc>("tasks").find({ sourceTaskId: taskId, createdById: ownerId, taskType: "code" }).toArray(),
+      );
+      const alreadyActiveRecipientIds = new Set(
+        existingDeliveries
+          .filter((d) => d.taskType === "code" && (d.status === "invited" || d.status === "accepted"))
+          .map((d) => d.assignedToId?.toString())
+          .filter((v): v is string => Boolean(v)),
+      );
+
       const now = new Date();
       const createdIds: string[] = [];
       const mailPromises: Promise<{ sent: boolean }>[] = [];
       for (const recipient of resolved.recipients) {
+        if (alreadyActiveRecipientIds.has(recipient._id.toString())) continue;
         const assignmentId = new ObjectId();
         await writeAppDocument("tasks", {
           _id: assignmentId,
@@ -488,6 +502,15 @@ export async function PATCH(request: Request, { params }: RouteContext) {
         { status: "invited", assignedToId: ownerId.toString() },
       );
       if (!updated.updated) return Response.json({ error: "Bài tập vừa được xử lý ở nơi khác." }, { status: 409 });
+      await recordUserActivity({
+        userId: ownerId.toString(),
+        event: "action",
+        kind: "code_task",
+        path: `/code-tasks/${taskId.toString()}`,
+        targetId: taskId.toString(),
+        title: task.title,
+        note: "Đã chấp nhận bài tập Code",
+      });
       return Response.json({ ok: true });
     }
 
@@ -503,6 +526,15 @@ export async function PATCH(request: Request, { params }: RouteContext) {
         { status: "invited", assignedToId: ownerId.toString() },
       );
       if (!updated.updated) return Response.json({ error: "Bài tập vừa được xử lý ở nơi khác." }, { status: 409 });
+      await recordUserActivity({
+        userId: ownerId.toString(),
+        event: "action",
+        kind: "code_task",
+        path: `/code-tasks/${taskId.toString()}`,
+        targetId: taskId.toString(),
+        title: task.title,
+        note: "Đã từ chối bài tập Code",
+      });
       return Response.json({ ok: true });
     }
 
